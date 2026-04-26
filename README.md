@@ -54,3 +54,35 @@ npm run lint
 ```sh
 npm run format
 ```
+
+## Use with Docker
+
+### Start the container
+
+Installs dependencies and runs a dev server at `localhost:5173`.
+
+```sh
+docker compose up
+```
+
+### Stop the container
+
+Press `Ctrl + C` in the terminal where `docker compose up` is running, or
+
+```sh
+docker compose down
+```
+
+### Run commands
+
+Connect to the shell:
+
+```sh
+docker compose exec -it vue-app sh
+```
+
+Or run commands from outside the container:
+
+```sh
+docker compose exec vue-app <command>
+```
