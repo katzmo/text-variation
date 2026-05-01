@@ -38,6 +38,17 @@
           text-align: justify;
           background-color: var(--bg-color, blanchedalmond);
           padding: 0.5em;
+          transition: filter 400ms ease-in-out;
+        }
+        .text-segment.highlight:not(.aligned) {
+          filter: brightness(0.8);
+        }
+        .text-segment.aligned {
+          outline: 3px solid #888;
+          outline-offset: min(0.2rem, 0.5em);
+          box-shadow:
+            3rem 0 0 -2rem #888,
+            -3rem 0 0 -2rem #888;
         }
       }
     </style>
@@ -66,11 +77,76 @@
   <body>
     <h1>Test view</h1>
     <p>To zoom, use +/- keys or press Ctrl/Cmd and scroll.</p>
+    <p>Click on a text segment to align the bars on it.</p>
 
     <div id="sequences"></div>
 
     <script>
       const wrapper = document.getElementById("sequences")
+
+      // Highlight and align segments
+      // ----------------------------
+      function alignSections(targetElements) {
+        // Find the greatest offset of target from column start
+        let maxOffsetTop = 0
+
+        targetElements.forEach((element) => {
+          const column = element.closest("tei-tei")
+          if (!column) return
+
+          const offsetFromColumnStart = element.offsetTop - column.offsetTop
+          maxOffsetTop = Math.max(maxOffsetTop, offsetFromColumnStart)
+        })
+
+        // Push every column so its target is at that offset from container top
+        targetElements.forEach((element) => {
+          const column = element.closest("tei-tei")
+          if (!column) return
+
+          const offsetFromColumnStart = element.offsetTop - column.offsetTop
+          const marginNeeded = maxOffsetTop - offsetFromColumnStart
+          column.style.marginTop = marginNeeded + "px"
+        })
+
+        // Scroll the first target into view
+        if (targetElements.length > 0) {
+          targetElements[0].scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+          })
+        }
+      }
+
+      function findMatchingSections(wrapper, section) {
+        id = section.dataset.id
+        if (!id) return []
+        return wrapper.querySelectorAll(`[data-id="${id}"]`)
+      }
+
+      // Add hover background
+      wrapper.addEventListener("mouseover", (event) => {
+        findMatchingSections(wrapper, event.target).forEach((elem) => {
+          elem.classList.add("highlight")
+        })
+      })
+      // Remove hover background
+      wrapper.addEventListener("mouseout", (event) => {
+        findMatchingSections(wrapper, event.target).forEach((elem) => {
+          elem.classList.remove("highlight")
+        })
+      })
+      // Align on click
+      wrapper.addEventListener("click", (event) => {
+        const targets = findMatchingSections(wrapper, event.target)
+        if (!targets.length) return
+        wrapper.querySelectorAll(".text-segment.aligned").forEach((elem) => {
+          elem.classList.remove("aligned")
+        })
+        alignSections(targets)
+        targets.forEach((elem) => {
+          elem.classList.add("aligned")
+        })
+      })
 
       // Zoom with +/- or mouse
       // ----------------------
