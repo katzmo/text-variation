@@ -1,0 +1,201 @@
+/* Non-text elements */
+tei-figure,
+tei-note,
+tei-front,
+tei-back {
+  display: none;
+}
+
+/* Text blocks */
+tei-ab,
+tei-l {
+  display: block;
+}
+tei-lg,
+tei-p {
+  display: block;
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+  text-align: justify;
+}
+tei-quote tei-p {
+  margin: 0.5em;
+}
+
+/* Text display */
+tei-text {
+  font-family: serif;
+}
+tei-hi:not([rend]),
+tei-emph:not([rend]),
+tei-title:not([rend]) {
+  font-style: italic;
+  text-decoration: none;
+}
+[rend~="bold"] {
+  font-weight: bold;
+}
+[rend~="italic"],
+[rend~="italics"] {
+  font-style: italic;
+}
+[rend~="smallcap"],
+[rend~="smallcaps"] {
+  font-variant: small-caps;
+}
+[rend~="underline"],
+[rend~="underlined"] {
+  text-decoration: underline;
+}
+[rend~="linethrough"],
+[rend~="strikethrough"] {
+  text-decoration: line-through;
+}
+[rend~="sup"],
+[rend~="super"],
+[rend~="superscript"] {
+  vertical-align: super;
+}
+[rend~="sub"],
+[rend~="subscript"] {
+  vertical-align: super;
+}
+
+/* Text alignment */
+[rend~="left"],
+[rend~="align(left)"] {
+  text-align: left;
+}
+[rend~="center"],
+[rend~="align(center)"] {
+  text-align: center;
+}
+[rend~="right"],
+[rend~="align(right)"] {
+  text-align: right;
+}
+[rend~="block"],
+[rend~="align(block)"],
+[rend~="justify"],
+[rend~="align(justify)"] {
+  text-align: justify;
+}
+
+/* Headings */
+tei-head[data-level] {
+  display: block;
+  margin-bottom: 0.5em;
+}
+tei-head[data-level="1"] {
+  font-size: 180%;
+}
+tei-head[data-level="2"] {
+  font-size: 160%;
+}
+tei-head[data-level="3"] {
+  font-size: 140%;
+}
+tei-head[data-level="4"] {
+  font-size: 120%;
+}
+
+/* Lists */
+tei-list {
+  display: block;
+  margin: 0.5em 0;
+  padding-left: 1.5em;
+  list-style-type: disc;
+
+  &[type="ordered"] {
+    list-style-type: decimal;
+  }
+  &[type="simple"] {
+    list-style-type: none;
+  }
+
+  tei-item {
+    display: list-item;
+    margin: 0.25em 0;
+  }
+
+  tei-list {
+    margin-top: 0.25em;
+    list-style-type: circle;
+
+    &[type="ordered"] {
+      list-style-type: lower-alpha;
+    }
+    &[type="simple"] {
+      list-style-type: none;
+    }
+
+    tei-list {
+      list-style-type: square;
+      &[type="ordered"] {
+        list-style-type: lower-roman;
+      }
+      &[type="simple"] {
+        list-style-type: none;
+      }
+    }
+  }
+}
+
+/* Tables */
+tei-row {
+  display: table-row;
+}
+tei-cell {
+  display: table-cell;
+  padding: 0.25em;
+}
+
+/* Revisions */
+tei-del {
+  color: #777;
+  text-decoration: line-through;
+}
+tei-add {
+  font-size: 90%;
+  vertical-align: super;
+  text-decoration: underline double;
+  text-decoration-color: #777;
+  text-underline-offset: 0.2em;
+}
+tei-sic + tei-corr,
+tei-abbr + tei-expan,
+tei-orig + tei-reg {
+  display: none;
+}
+
+/* Missing or unclear */
+tei-ex,
+tei-reg,
+tei-corr,
+tei-expan,
+tei-unclear,
+tei-supplied {
+  &::before {
+    content: "[";
+  }
+  &::after {
+    content: "]";
+  }
+}
+tei-unclear {
+  color: #777;
+}
+tei-gap {
+  color: #777; /* 66% */
+  font-style: italic;
+
+  &::before {
+    content: "<";
+  }
+  &::after {
+    content: ">";
+  }
+  .reason:empty::before {
+    content: "…";
+  }
+}

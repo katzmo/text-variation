@@ -1,0 +1,133 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Text variation sequences</title>
+    <!-- https://github.com/TEIC/CETEIcean/releases -->
+    <script src="CETEI.min.js"></script>
+    <!-- custom styles -->
+    <link rel="stylesheet" href="tei.css" />
+    <style>
+      body {
+        padding: 3rem;
+        font-family: sans-serif;
+      }
+      #sequences {
+        --zoom-level: 25%;
+        --text-color: #333;
+        display: flex;
+        column-gap: max(1%, 1rem);
+        padding: max(1%, 1rem);
+        overflow: scroll;
+        cursor: default;
+        zoom: var(--zoom-level);
+        font-size: min(var(--zoom-level), 100%);
+        color: rgba(50, 50, 50, var(--zoom-level));
+
+        > * {
+          margin-bottom: auto;
+          background-color: white;
+          min-width: 22em;
+          max-width: 100em;
+          transition: margin 0.3s ease;
+        }
+
+        .text-segment {
+          display: block;
+          text-align: justify;
+          background-color: var(--bg-color, blanchedalmond);
+          padding: 0.5em;
+        }
+      }
+    </style>
+    <script type="module">
+      // Initialize CETEIcean
+      const c = new CETEI()
+      c.addBehaviors({
+        tei: {
+          // Add paragraphs with "text-segment" class + data-id to sections
+          section: ["<p class='text-segment' data-id='$@n'>", "</p>"],
+        },
+      })
+      for (const file of [
+        "data/darwin1859.xml",
+        "data/darwin1860.xml",
+        "data/darwin1861.xml",
+        "data/darwin1866.xml",
+        "data/darwin1869.xml",
+        "data/darwin1872.xml",
+      ]) {
+        const data = await c.getHTML5(file)
+        document.getElementById("sequences").appendChild(data)
+      }
+    </script>
+  </head>
+  <body>
+    <h1>Test view</h1>
+    <p>To zoom, use +/- keys or press Ctrl/Cmd and scroll.</p>
+
+    <div id="sequences"></div>
+
+    <script>
+      const wrapper = document.getElementById("sequences")
+
+      // Zoom with +/- or mouse
+      // ----------------------
+      let currentZoom = parseFloat(
+        getComputedStyle(wrapper).getPropertyValue("--zoom-level"),
+      )
+      const minZoom = 10
+      const maxZoom = 150
+      const zoomStep = 5
+
+      updateZoom()
+
+      // Scroll wheel zoom
+      wrapper.addEventListener(
+        "wheel",
+        (e) => {
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault()
+            if (e.deltaY < 0) {
+              zoomIn()
+            } else {
+              zoomOut()
+            }
+          }
+        },
+        { passive: false },
+      )
+
+      // Keyboard shortcuts
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "+") {
+          e.preventDefault()
+          zoomIn()
+        } else if (e.key === "-") {
+          e.preventDefault()
+          zoomOut()
+        }
+      })
+
+      function zoomIn() {
+        if (currentZoom + zoomStep < maxZoom) {
+          currentZoom += zoomStep
+          updateZoom()
+        }
+      }
+
+      function zoomOut() {
+        if (currentZoom - zoomStep > minZoom) {
+          currentZoom -= zoomStep
+          updateZoom()
+        }
+      }
+
+      function updateZoom() {
+        wrapper.style.setProperty("--zoom-level", currentZoom + "%")
+        alignSections(wrapper.querySelectorAll(".text-segment.aligned"))
+      }
+    </script>
+  </body>
+</html>
