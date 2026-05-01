@@ -33,6 +33,26 @@
           transition: margin 0.3s ease;
         }
 
+        .reference {
+          /*position: sticky;
+          left: 0;
+          right: 0;*/
+          border: 3px solid #888;
+          box-shadow: 0 0.5em 1em #0008;
+        }
+
+        .identifier {
+          cursor: pointer;
+          color: #333;
+          text-align: center;
+          justify-self: center;
+          display: inline-block;
+          zoom: max(calc(150% / var(--zoom-level)));
+          background-color: #ccc;
+          border-radius: 10rem;
+          padding: 0.5em;
+        }
+
         .text-segment {
           display: block;
           text-align: justify;
@@ -57,6 +77,16 @@
       const c = new CETEI()
       c.addBehaviors({
         tei: {
+          // Display document ID
+          TEI: (el) => {
+            const xmlId = el.getAttribute("xml:id")
+            if (xmlId) {
+              el.insertAdjacentHTML(
+                "afterbegin",
+                `<div class="identifier">${xmlId}</div>`,
+              )
+            }
+          },
           // Add paragraphs with "text-segment" class + data-id to sections
           section: ["<p class='text-segment' data-id='$@n'>", "</p>"],
         },
@@ -78,6 +108,10 @@
     <h1>Test view</h1>
     <p>To zoom, use +/- keys or press Ctrl/Cmd and scroll.</p>
     <p>Click on a text segment to align the bars on it.</p>
+    <p>
+      Click on an identifier label to select the text as reference and color
+      segments by position.
+    </p>
 
     <div id="sequences"></div>
 
@@ -204,6 +238,29 @@
         wrapper.style.setProperty("--zoom-level", currentZoom + "%")
         alignSections(wrapper.querySelectorAll(".text-segment.aligned"))
       }
+
+      // Reference text + color by position
+      //-----------------------------------
+      wrapper.addEventListener("click", (event) => {
+        if (event.target.classList.contains("identifier")) {
+          event.preventDefault()
+          // Set "reference" class
+          wrapper.querySelector(".reference")?.classList.remove("reference")
+          const reference = event.target.parentElement
+          reference.classList.add("reference")
+          // Distribute colors over segments
+          wrapper.querySelectorAll(".text-segment").forEach((element) => {
+            element.style.setProperty("--bg-color", `#eee`) // default, not in reference
+          })
+          const segments = reference.querySelectorAll(".text-segment")
+          segments.forEach((segment, index) => {
+            const hue = (index / segments.length) * 270 + 60 // Distribute hues across 360°
+            findMatchingSections(wrapper, segment).forEach((target) => {
+              target.style.setProperty("--bg-color", `hsl(${hue}, 60%, 80%)`)
+            })
+          })
+        }
+      })
     </script>
   </body>
 </html>
