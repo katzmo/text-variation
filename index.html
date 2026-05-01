@@ -6,6 +6,8 @@
     <title>Text variation sequences</title>
     <!-- https://github.com/TEIC/CETEIcean/releases -->
     <script src="CETEI.min.js"></script>
+    <!-- https://github.com/stjaenicke/TRAViz/blob/master/traviz-min.js -->
+    <script src="traviz-min.js"></script>
     <!-- custom styles -->
     <link rel="stylesheet" href="tei.css" />
     <style>
@@ -71,6 +73,40 @@
             -3rem 0 0 -2rem #888;
         }
       }
+
+      #bottom {
+        background-color: white;
+        box-shadow: 1px -1px 5px #0004;
+        padding: 0 3rem;
+        max-height: 50vh;
+        overflow: auto;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        transition: all 1s ease;
+
+        .buttons {
+          background-color: #fefefe;
+          padding: 1rem 0;
+          position: sticky;
+          left: 0;
+          top: 0;
+          z-index: 1;
+          display: flex;
+          column-gap: 1rem;
+          align-items: center;
+        }
+
+        button,
+        label {
+          font-size: 80%;
+          cursor: pointer;
+        }
+        input[switch] {
+          vertical-align: bottom;
+        }
+      }
     </style>
     <script type="module">
       // Initialize CETEIcean
@@ -114,6 +150,19 @@
     </p>
 
     <div id="sequences"></div>
+
+    <div id="bottom">
+      <div class="buttons">
+        <button type="button" class="graph">
+          Draw variant graph for current selection
+        </button>
+        <button type="button" class="hide" hidden>Hide</button>
+        <label hidden>
+          <input type="checkbox" name="break" switch /> Break lines
+        </label>
+      </div>
+      <div id="TRAVizContainer"></div>
+    </div>
 
     <script>
       const wrapper = document.getElementById("sequences")
@@ -259,6 +308,42 @@
               target.style.setProperty("--bg-color", `hsl(${hue}, 60%, 80%)`)
             })
           })
+        }
+      })
+
+      // Show TRAViz graph
+      // -----------------
+      const panel = document.getElementById("bottom")
+      const hideButton = panel.querySelector(".hide")
+      const graphButton = panel.querySelector(".graph")
+      const breakToggle = panel.querySelector("label")
+      hideButton.addEventListener("click", () => {
+        panel.querySelector("#TRAVizContainer").innerHTML = ""
+        hideButton.hidden = true
+        breakToggle.hidden = true
+      })
+      graphButton.addEventListener("click", () => {
+        var traviz = new TRAViz("TRAVizContainer", {
+          //colors: [],
+          normalize: false,
+          lineBreaks: breakToggle.querySelector("input").checked,
+          startAndEnd: false,
+          fontSizeMin: 18,
+          fontSizeIncrease: 0,
+          vertexBackground: false,
+          connectionType: "all",
+        })
+        const data = Array.from(wrapper.querySelectorAll(".aligned")).map(
+          (element) => ({
+            edition: element.closest("tei-tei").getAttribute("xml:id"),
+            text: element.innerText,
+          }),
+        )
+        if (data.length) {
+          traviz.align(data)
+          traviz.visualize()
+          hideButton.hidden = false
+          breakToggle.hidden = false
         }
       })
     </script>
