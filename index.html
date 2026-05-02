@@ -107,6 +107,52 @@
           vertical-align: bottom;
         }
       }
+
+      .overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: #0006;
+        z-index: 1000;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+
+        &.active {
+          display: flex;
+          opacity: 1;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .content {
+          background-color: white;
+          border-radius: 1rem;
+          padding: 1.5rem;
+          max-width: 36em;
+          width: 90%;
+          max-height: 80vh;
+          overflow-y: auto;
+          position: relative;
+          box-shadow: 0 4px 6px #0004;
+        }
+
+        .close {
+          position: absolute;
+          top: 0.5rem;
+          right: 0.5rem;
+          background: none;
+          border: none;
+          font-size: 170%;
+          cursor: pointer;
+          color: #666;
+          padding: 0;
+          width: 2rem;
+          height: 2rem;
+        }
+      }
     </style>
     <script type="module">
       // Initialize CETEIcean
@@ -125,19 +171,29 @@
           },
           // Add paragraphs with "text-segment" class + data-id to sections
           section: ["<p class='text-segment' data-id='$@n'>", "</p>"],
+          // Render line breaks
+          lb: ["<br>"],
+          // Display a reason in gaps
+          gap: ['<span class="reason">$@reason</span>'],
+          // Display header information
+          teiHeader: null,
         },
       })
-      for (const file of [
-        "data/darwin1859.xml",
-        "data/darwin1860.xml",
-        "data/darwin1861.xml",
-        "data/darwin1866.xml",
-        "data/darwin1869.xml",
-        "data/darwin1872.xml",
-      ]) {
+      const files = {
+        OS_1859: "data/darwin1859.xml",
+        OS_1860: "data/darwin1860.xml",
+        OS_1861: "data/darwin1861.xml",
+        OS_1866: "data/darwin1866.xml",
+        OS_1869: "data/darwin1869.xml",
+        OS_1872: "data/darwin1872.xml",
+      }
+      for (const file of Object.values(files)) {
         const data = await c.getHTML5(file)
         document.getElementById("sequences").appendChild(data)
       }
+      // Make available globally
+      window.c = c
+      window.files = files
     </script>
   </head>
   <body>
@@ -148,6 +204,7 @@
       Click on an identifier label to select the text as reference and color
       segments by position.
     </p>
+    <p>Right-click on an identifier label to display the text in an overlay.</p>
 
     <div id="sequences"></div>
 
@@ -162,6 +219,13 @@
         </label>
       </div>
       <div id="TRAVizContainer"></div>
+    </div>
+
+    <div id="overlay" class="overlay">
+      <div class="content">
+        <button class="close">&times;</button>
+        <div id="tei-wrapper-overlay">Your content goes here.</div>
+      </div>
     </div>
 
     <script>
@@ -309,6 +373,49 @@
             })
           })
         }
+      })
+
+      // Open a single text in overlay
+      // -----------------------------
+      const overlay = document.getElementById("overlay")
+      const overlayTeiWrapper = document.getElementById("tei-wrapper-overlay")
+      const closeButton = overlay.querySelector(".close")
+
+      function openOverlay() {
+        overlay.classList.add("active")
+        document.body.style.overflow = "hidden"
+      }
+      function closeOverlay() {
+        overlay.classList.remove("active")
+        document.body.style.overflow = "auto"
+      }
+      // Open overlay on right-click
+      wrapper.addEventListener("contextmenu", (event) => {
+        if (event.target.classList.contains("identifier")) {
+          event.preventDefault()
+          const column = event.target.closest("tei-tei")
+          const aligned = column.querySelector(".text-segment.aligned")
+          c.getHTML5(files[column.getAttribute("xml:id")]).then((data) => {
+            overlayTeiWrapper.replaceChildren(data)
+            openOverlay()
+            if (aligned) {
+              overlay
+                .querySelector(`.text-segment[data-id="${aligned.dataset.id}"`)
+                .scrollIntoView({ block: "center" })
+            }
+          })
+        }
+      })
+      // Close overlay when close button is clicked
+      closeButton.addEventListener("click", closeOverlay)
+      // Close overlay when background is clicked
+      overlay.addEventListener("click", (event) => {
+        if (event.target === overlay) closeOverlay()
+      })
+      // Close overlay when Escape key is pressed
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && overlay.classList.contains("active"))
+          closeOverlay()
       })
 
       // Show TRAViz graph

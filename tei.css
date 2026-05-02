@@ -1,9 +1,12 @@
 /* Non-text elements */
-tei-figure,
-tei-note,
-tei-front,
-tei-back {
-  display: none;
+#sequences {
+  tei-header,
+  tei-figure,
+  tei-note,
+  tei-front,
+  tei-back {
+    display: none;
+  }
 }
 
 /* Text blocks */
@@ -197,5 +200,12 @@ tei-gap {
   }
   .reason:empty::before {
     content: "…";
+  }
+}
+
+/* TEI header */
+tei-teiheader {
+  tei-title {
+    font-size: 160%;
   }
 }
