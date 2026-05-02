@@ -16,7 +16,7 @@
         font-family: sans-serif;
       }
       #sequences {
-        --zoom-level: 25%;
+        --zoom-level: 0.25;
         --text-color: #333;
         display: flex;
         column-gap: max(1%, 1rem);
@@ -24,8 +24,9 @@
         overflow: scroll;
         cursor: default;
         zoom: var(--zoom-level);
-        font-size: min(var(--zoom-level), 100%);
+        font-size: min(100% * var(--zoom-level), 100%);
         color: rgba(50, 50, 50, var(--zoom-level));
+        max-height: calc(100vh / var(--zoom-level));
 
         > * {
           margin-bottom: auto;
@@ -49,10 +50,13 @@
           text-align: center;
           justify-self: center;
           display: inline-block;
-          zoom: max(calc(150% / var(--zoom-level)));
+          zoom: calc(150% / var(--zoom-level));
           background-color: #ccc;
           border-radius: 10rem;
           padding: 0.5em;
+          position: sticky;
+          top: 0;
+          z-index: 1;
         }
 
         .text-segment {
@@ -300,9 +304,9 @@
       let currentZoom = parseFloat(
         getComputedStyle(wrapper).getPropertyValue("--zoom-level"),
       )
-      const minZoom = 10
-      const maxZoom = 150
-      const zoomStep = 5
+      const minZoom = 0.1
+      const maxZoom = 1.5
+      const zoomStep = 0.05
 
       updateZoom()
 
@@ -348,7 +352,7 @@
       }
 
       function updateZoom() {
-        wrapper.style.setProperty("--zoom-level", currentZoom + "%")
+        wrapper.style.setProperty("--zoom-level", currentZoom)
         alignSections(wrapper.querySelectorAll(".text-segment.aligned"))
       }
 
