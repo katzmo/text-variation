@@ -1,0 +1,25 @@
+services:
+
+  backend:
+    build: ./backend
+    container_name: kat-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - kat-data:/app/data
+    environment:
+      - DATA_DIR=/app/data/witnesses
+      - UPLOAD_DIR=/app/data/uploads
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend-vue
+    container_name: kat-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  kat-data:
