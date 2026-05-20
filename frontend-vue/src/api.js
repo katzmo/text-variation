@@ -74,3 +74,9 @@ export async function postSaveAlignment() {
   if (!r.ok) throw new Error('Save failed')
   return r.json()
 }
+
+export async function fetchAlignMatrix(maxRows = 0) {
+  const r = await fetch(`${API}/align/matrix?max_rows=${maxRows}`)
+  if (!r.ok) throw new Error('Matrix fetch failed')
+  return r.json()
+}

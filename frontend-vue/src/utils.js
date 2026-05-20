@@ -8,15 +8,22 @@ export function jaccard(a, b) {
 }
 
 // ── UPGMA dendrogram ────────────────────────────────────────────────────────
-export function upgma(ids, getTextFn) {
+export function upgma(ids, getTextFn, sampleIndices = null) {
   const n = ids.length
-  const NS = 8 // number of segments to sample for distance
+  // Which segment indices to sample for the distance. Default: first 8.
+  // Callers with a real alignment can pass indices spread across the whole range.
+  const samples = sampleIndices && sampleIndices.length ? sampleIndices : [0,1,2,3,4,5,6,7]
   const dist = Array.from({ length: n }, (_, i) =>
     Array.from({ length: n }, (_, j) => {
       if (i === j) return 0
-      let s = 0
-      for (let k = 0; k < NS; k++) s += jaccard(getTextFn(ids[i], k), getTextFn(ids[j], k))
-      return 1 - s / NS
+      let s = 0, counted = 0
+      for (const k of samples) {
+        const a = getTextFn(ids[i], k), b = getTextFn(ids[j], k)
+        // Only count positions where at least one witness has text, so gaps
+        // don't wash every pair out to "equally dissimilar".
+        if (a || b) { s += jaccard(a, b); counted++ }
+      }
+      return counted ? 1 - s / counted : 1
     })
   )
 
@@ -92,37 +99,48 @@ export function parseTEI(content, filename) {
   const getAllTags = tag => [...doc.getElementsByTagNameNS(NS, tag), ...doc.getElementsByTagName(tag)]
 
   const titleEl = getTag('title')
+  const authorEl = getTag('author')
   const idnoEl = getTag('idno')
   const dateEl = getTag('origDate') || getTag('date')
   const placeEl = getTag('origPlace') || getTag('settlement') || getTag('pubPlace')
   const sourceEl = getTag('repository') || getTag('bibl')
   const geoEl = getTag('geo')
   const affilEl = getAllTags('note').find(n => n.getAttribute('type') === 'affiliation')
+  const msDescEl = getTag('msDesc')
+
+  // Witness id: prefer the filename prefix (before first '-' or '.'), it is the
+  // most consistent identifier across a corpus. Fall back to msDesc/@xml:id.
+  const fileStem = filename.replace(/\.[^.]+$/, '')
+  let id = fileStem.split(/[-.]/)[0].trim()
+  if (!id && msDescEl) id = msDescEl.getAttributeNS(XML_NS, 'id') || msDescEl.getAttribute('xml:id') || ''
 
   let year = null
   if (dateEl) {
-    const m = (dateEl.getAttribute('when') || dateEl.textContent || '').match(/\d{4}/)
+    const m = (dateEl.getAttribute('when') || dateEl.textContent || '').match(/\d{3,4}/)
     if (m) year = parseInt(m[0])
   }
 
-  let rawName = filename.replace(/\.[^.]+$/, '')
-  if (titleEl && idnoEl?.textContent) rawName = `${titleEl.textContent.trim()} (${idnoEl.textContent.trim()})`
+  // Display name: prefer "<title> (<idno>)", then title, then author, then filename
+  let rawName = fileStem
+  if (titleEl?.textContent && idnoEl?.textContent) rawName = `${titleEl.textContent.trim()} (${idnoEl.textContent.trim()})`
   else if (titleEl?.textContent) rawName = titleEl.textContent.trim()
+  else if (authorEl?.textContent) rawName = authorEl.textContent.trim()
 
   const country = placeEl?.textContent.trim() || ''
   const affiliation = affilEl?.textContent.trim() || ''
   const source = sourceEl?.textContent.trim() || ''
+  const author = authorEl?.textContent.trim() || ''
   let lat = 0, lng = 0
   if (geoEl?.textContent) {
-    const coords = geoEl.textContent.trim().split(/\s+/)
+    const coords = geoEl.textContent.trim().split(/[\s,]+/)
     if (coords.length >= 2) { lat = parseFloat(coords[0]) || 0; lng = parseFloat(coords[1]) || 0 }
   }
 
   const segments = {}
   ;['p', 'lg', 'l', 'ab'].forEach(tag => {
     getAllTags(tag).forEach(el => {
-      const id = el.getAttributeNS(XML_NS, 'id') || el.getAttribute('xml:id') || el.getAttribute('id')
-      if (id) segments[id] = el.textContent.replace(/\s+/g, ' ').trim()
+      const sid = el.getAttributeNS(XML_NS, 'id') || el.getAttribute('xml:id') || el.getAttribute('id')
+      if (sid) segments[sid] = el.textContent.replace(/\s+/g, ' ').trim()
     })
   })
   if (!Object.keys(segments).length) {
@@ -131,16 +149,25 @@ export function parseTEI(content, filename) {
     })
   }
 
-  return { name: rawName, year: year || 1500, country, affiliation, source, lat, lng, segments }
+  // Track which fields were genuinely found, so the UI can show what was auto-detected
+  const detected = {
+    year: year !== null,
+    country: !!country,
+    source: !!source,
+    coords: !!(lat || lng),
+  }
+
+  return { id, name: rawName, author, year, country, affiliation, source, lat, lng, segments, detected }
 }
 
 export function parsePlainText(content, filename) {
-  const name = filename.replace(/\.[^.]+$/, '')
+  const fileStem = filename.replace(/\.[^.]+$/, '')
+  const id = fileStem.split(/[-.]/)[0].trim()
   const segments = {}
   content.split(/\n+/).map(l => l.trim()).filter(Boolean).forEach((l, i) => {
     segments[`seg-${String(i + 1).padStart(3, '0')}`] = l
   })
-  return { name, year: 1500, segments }
+  return { id, name: fileStem, year: null, country: '', affiliation: '', source: '', lat: 0, lng: 0, segments, detected: {} }
 }
 
 export function parseCSV(content) {

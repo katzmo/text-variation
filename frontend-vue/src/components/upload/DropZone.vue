@@ -46,10 +46,10 @@ async function addFiles(fileList) {
     const ext  = file.name.split('.').pop().toLowerCase()
     const content = await readFile(file)
     const type = ['csv','json'].includes(ext) ? ext : ext === 'xml' ? 'xml' : 'txt'
-    let parsed = false, segCount = 0, segments = {}, detectedName = file.name, detectedYear = 1500
-    if (type === 'xml') { const r = parseTEI(content, file.name); segments = r.segments; detectedName = r.name; detectedYear = r.year; segCount = Object.keys(segments).length; parsed = true }
-    else if (type === 'txt') { const r = parsePlainText(content, file.name); segments = r.segments; detectedName = r.name; segCount = Object.keys(segments).length; parsed = true }
-    current.push({ name: file.name, type, content, parsed, segCount, segments, detectedName, detectedYear })
+    let parsed = false, segCount = 0, segments = {}, meta = null
+    if (type === 'xml') { meta = parseTEI(content, file.name); segments = meta.segments; segCount = Object.keys(segments).length; parsed = true }
+    else if (type === 'txt') { meta = parsePlainText(content, file.name); segments = meta.segments; segCount = Object.keys(segments).length; parsed = true }
+    current.push({ name: file.name, type, content, parsed, segCount, segments, meta })
   }
   emit('update:files', current)
 }

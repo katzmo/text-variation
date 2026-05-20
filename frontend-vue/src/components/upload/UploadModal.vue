@@ -76,17 +76,19 @@ async function goToMeta() {
   const csvFile = files.value.find(f => f.type === 'csv')
   const csvRows = csvFile ? parseCSV(csvFile.content) : []
   meta.value = textFiles.value.map((f, i) => {
-    const id  = f.name.replace(/\.[^.]+$/, '').toUpperCase().slice(0, 6)
-    const csv = csvRows.find(r => r.id === id) || csvRows[i] || {}
+    const m = f.meta || {}
+    const fallbackId = f.name.replace(/\.[^.]+$/, '').split(/[-.]/)[0].trim()
+    const id = (m.id || fallbackId || `W${i + 1}`).toUpperCase()
+    const csv = csvRows.find(r => (r.id || '').toUpperCase() === id) || csvRows[i] || {}
     return {
       id:   csv.id || id,
-      name: csv.name || f.detectedName,
-      year: parseInt(csv.year || f.detectedYear || 1500),
-      country:     csv.country || 'Unknown',
-      lat:         parseFloat(csv.lat || 51.5),
-      lng:         parseFloat(csv.lng || -0.1),
-      affiliation: csv.affiliation || 'Protestant',
-      source:      csv.source || 'Unknown',
+      name: csv.name || m.name || f.name,
+      year: parseInt(csv.year || m.year || '') || null,
+      country:     csv.country || m.country || '',
+      lat:         parseFloat(csv.lat ?? m.lat ?? 0) || 0,
+      lng:         parseFloat(csv.lng ?? m.lng ?? 0) || 0,
+      affiliation: csv.affiliation || m.affiliation || '',
+      source:      csv.source || m.source || '',
       segments:    f.segments,
       filename:    f.name,
     }

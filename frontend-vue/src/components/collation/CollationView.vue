@@ -6,8 +6,11 @@
       <!-- Header -->
       <div class="collation-header">
         <span class="collation-title">Collation view</span>
-        <span class="collation-sub">drag columns · click segment · zoom</span>
+        <span class="collation-sub">drag columns · click badge to highlight · × to hide · zoom</span>
         <div style="display:flex;align-items:center;gap:8px;margin-left:auto;">
+          <button v-if="hiddenCols.size" class="col-show-hidden" @click="showAllCols" :title="'Show ' + hiddenCols.size + ' hidden column(s)'">
+            {{ hiddenCols.size }} hidden · show all
+          </button>
           <span style="font-family:var(--mono);font-size:10px;color:var(--ink3);">zoom</span>
           <input type="range" min="36" max="130" v-model.number="zoom" style="width:80px;height:3px;accent-color:var(--ink)"/>
           <button class="col-settings-btn" @click="showSettings=!showSettings" title="Settings">⚙</button>
@@ -20,8 +23,8 @@
       <!-- Minimap -->
       <div class="col-minimap" ref="minimapEl" @click="minimapClick">
         <div class="col-minimap-inner">
-          <div class="col-minimap-col" v-for="w in colOrder" :key="w.id">
-            <div v-for="(s,si) in segs" :key="si" class="col-minimap-seg" :style="{background: segColor(w.id,si)}"></div>
+          <div class="col-minimap-col" v-for="w in visibleCols" :key="w.id">
+            <div v-for="si in minimapRows" :key="si" class="col-minimap-seg" :style="{background: segColor(w.id,si)}"></div>
           </div>
         </div>
         <div class="col-minimap-vp" :style="minimapVP"></div>
@@ -38,9 +41,9 @@
           <div class="col-inner">
             <div class="col-row" ref="rowEl">
               <div
-                v-for="(w, wi) in colOrder" :key="w.id"
+                v-for="(w, wi) in visibleCols" :key="w.id"
                 class="col-wit"
-                :class="{ dragging: dragId===w.id, 'col-drag-over': dragOver===w.id, 'col-zoomed': zoom>90 }"
+                :class="{ dragging: dragId===w.id, 'col-drag-over': dragOver===w.id, 'col-zoomed': zoom>90, 'col-selected': selectedWit===w.id }"
                 :style="{ width: cw + 'px' }"
                 draggable="true"
                 @dragstart="dragId=w.id"
@@ -48,8 +51,11 @@
                 @drop="onDrop(w.id)"
                 @dragend="dragId=null; dragOver=null; drawDendro()"
               >
-                <div class="col-badge" :class="[badgeClass(wi, w.id), { active: selectedWit===w.id }]" @click="selectedWit=w.id">
-                  {{ w.id }}
+                <div class="col-badge-wrap">
+                  <div class="col-badge" :class="[badgeClass(wi, w.id), { active: selectedWit===w.id }]" @click="selectedWit=w.id" :title="'Click to highlight ' + w.id">
+                    {{ w.id }}
+                  </div>
+                  <div class="col-hide-btn" @click.stop="toggleHideCol(w.id)" title="Hide this column">×</div>
                 </div>
                 <div class="col-segs">
                   <div
@@ -75,7 +81,7 @@
           <div class="col-detail-toggle" @click="detOpen=!detOpen">{{ detOpen ? '▼' : '▲' }}</div>
           <div class="col-detail-body" v-if="detOpen">
             <div class="col-detail-texts">
-              <div class="col-detail-wit" v-for="(w,wi) in colOrder" :key="w.id">
+              <div class="col-detail-wit" v-for="(w,wi) in visibleCols" :key="w.id">
                 <div class="col-detail-badge" :class="badgeClass(wi, w.id)">{{ w.id }}</div>
                 <div class="col-detail-name">{{ w.name }}</div>
                 <div class="col-detail-segs">
@@ -108,7 +114,7 @@ import { useStore } from '../../composables/useStore.js'
 import { jaccard, upgma, leafOrder, normalizeText, badgeClass as _badgeClass } from '../../utils.js'
 import { postCollate } from '../../api.js'
 
-const { witnesses, selectedWit, selectedVariant, getSegText: storeGetSegText } = useStore()
+const { witnesses, selectedWit, selectedVariant, getSegText: storeGetSegText, alignMatrix, getAlignScore } = useStore()
 
 // Expose to template
 function getSegText(id, si) { return storeGetSegText(id, si) }
@@ -126,6 +132,7 @@ const dragOver = ref(null)
 const wavePath = ref(null)
 const sx       = ref(0); const sy = ref(0)
 const showSettings = ref(false)
+const hiddenCols = ref(new Set())   // witness ids hidden from view
 const settings = ref({ ref: '', colorMode: 'similarity', variation: ['spelling','grammar','other'], sortBy: 'manual' })
 
 // ── DOM refs ─────────────────────────────────────────────────────────────────
@@ -139,14 +146,39 @@ const variantGraphSvg= ref(null)
 const cw     = computed(() => Math.max(30, Math.round(zoom.value * 0.68)))
 const sh     = computed(() => Math.max(7,  Math.round(zoom.value * 0.175)))
 const BADGE_H = 38
-const totalW = computed(() => colOrder.value.length * cw.value + 16)
+// Only the columns not hidden by the user
+const visibleCols = computed(() => colOrder.value.filter(w => !hiddenCols.value.has(w.id)))
+// Downsampled row indices for the minimap (caps at ~40 so it always fits its box)
+const minimapRows = computed(() => {
+  const n = segs.value.length
+  const cap = 40
+  if (n <= cap) return Array.from({ length: n }, (_, i) => i)
+  return Array.from({ length: cap }, (_, i) => Math.floor(i * n / cap))
+})
+const totalW = computed(() => visibleCols.value.length * cw.value + 16)
 const totalH = computed(() => BADGE_H + segs.value.length * (sh.value + 2) + 10)
+
+function toggleHideCol(id) {
+  const s = new Set(hiddenCols.value)
+  if (s.has(id)) s.delete(id); else s.add(id)
+  hiddenCols.value = s
+  drawDendro()
+  if (activeSeg.value !== null) drawWave()
+}
+function showAllCols() { hiddenCols.value = new Set(); drawDendro() }
 
 function badgeClass(wi, id) { return _badgeClass(wi, id) }
 
 function normText(t) { return normalizeText(t, settings.value.variation) }
 
 function simScore(id, si) {
+  // When a real alignment matrix is loaded, the cell colour is the text
+  // similarity of that witness's aligned line to the anchor line (0 = gap).
+  if (alignMatrix.value) {
+    const sc = getAlignScore(id, si)
+    return sc == null ? 0 : sc
+  }
+  // Fallback (mock data): average pairwise Jaccard or similarity to a reference
   const t = normText(getSegText(id, si))
   if (!t) return 0
   const ref = settings.value.ref
@@ -161,6 +193,10 @@ function simScore(id, si) {
 
 function segColor(id, si) {
   const score = simScore(id, si)
+  // Gaps (no aligned line) render as a very light, neutral cell
+  if (alignMatrix.value && getAlignScore(id, si) === 0) {
+    return 'hsl(40,15%,93%)'
+  }
   if (settings.value.colorMode === 'position' && settings.value.ref) {
     return `hsl(${(si / segs.value.length) * 280},45%,${55 + score * 25}%)`
   }
@@ -204,23 +240,36 @@ function onDrop(toId) {
 // ── Dendro ───────────────────────────────────────────────────────────────────
 function drawDendro() {
   if (!dendroSvg.value || !tree.value) return
-  const cols = colOrder.value; const n = cols.length
+  const cols = visibleCols.value; const n = cols.length
   const W = n * cw.value + 16; const H = 100
   const svg = d3.select(dendroSvg.value).attr('width', W).attr('height', H)
   svg.selectAll('*').remove()
 
+  const visIds = new Set(cols.map(w => w.id))
   function xOf(id) { const idx = cols.findIndex(w => w.id === id); return idx < 0 ? -999 : 8 + idx * cw.value + cw.value / 2 }
   function leafIds(node) { if (!node.left && !node.right) return [node.id]; return [...leafIds(node.left), ...leafIds(node.right)] }
-  function midX(node) { const xs = leafIds(node).map(id => xOf(id)).filter(x => x > 0); if (!xs.length) return 0; return (Math.min(...xs) + Math.max(...xs)) / 2 }
-  function nodeY(node) { return H - 8 - node.h * (H - 40) * 4.5 }
+  function visibleLeaves(node) { return leafIds(node).filter(id => visIds.has(id)) }
+  function midX(node) { const xs = visibleLeaves(node).map(id => xOf(id)).filter(x => x > 0); if (!xs.length) return null; return (Math.min(...xs) + Math.max(...xs)) / 2 }
+  // Normalise branch heights against the tree root so the tree fills the panel.
+  // Guard against a degenerate tree (all heights equal/zero) so it still draws.
+  const maxH = (tree.value.h && tree.value.h > 0) ? tree.value.h : 1
+  function nodeY(node) {
+    const frac = maxH > 0 ? (node.h / maxH) : 0.5
+    return H - 10 - frac * (H - 24)
+  }
   function draw(node) {
     if (!node.left && !node.right) return
-    const ny = nodeY(node); const lx = midX(node.left); const rx = midX(node.right)
-    const ly = node.left.left ? nodeY(node.left) : H - 8; const ry = node.right.left ? nodeY(node.right) : H - 8
+    const lx = midX(node.left); const rx = midX(node.right)
+    if (lx === null && rx === null) { draw(node.left); draw(node.right); return }
+    const ny = nodeY(node)
+    const ly = node.left.left ? nodeY(node.left) : H - 10; const ry = node.right.left ? nodeY(node.right) : H - 10
     const g = svg.append('g')
-    g.append('line').attr('x1',lx).attr('y1',ny).attr('x2',rx).attr('y2',ny).attr('stroke','#aaa').attr('stroke-width',1.5)
-    g.append('line').attr('x1',lx).attr('y1',ny).attr('x2',lx).attr('y2',ly).attr('stroke','#aaa').attr('stroke-width',1.5)
-    g.append('line').attr('x1',rx).attr('y1',ny).attr('x2',rx).attr('y2',ry).attr('stroke','#aaa').attr('stroke-width',1.5)
+    if (lx !== null && rx !== null)
+      g.append('line').attr('x1',lx).attr('y1',ny).attr('x2',rx).attr('y2',ny).attr('stroke','#aaa').attr('stroke-width',1.2)
+    if (lx !== null)
+      g.append('line').attr('x1',lx).attr('y1',ny).attr('x2',lx).attr('y2',ly).attr('stroke','#aaa').attr('stroke-width',1.2)
+    if (rx !== null)
+      g.append('line').attr('x1',rx).attr('y1',ny).attr('x2',rx).attr('y2',ry).attr('stroke','#aaa').attr('stroke-width',1.2)
     draw(node.left); draw(node.right)
   }
   draw(tree.value)
@@ -229,7 +278,7 @@ function drawDendro() {
 // ── Wave ─────────────────────────────────────────────────────────────────────
 function drawWave() {
   const si = activeSeg.value; if (si === null) return
-  const cols = colOrder.value
+  const cols = visibleCols.value
   const segY = BADGE_H + si * (sh.value + 2) + sh.value / 2
   const amp  = Math.max(8, Math.min(30, sh.value * 1.2))
   const pts  = cols.map((w, i) => [8 + i * cw.value + cw.value / 2, segY + (1 - simScore(w.id, si)) * amp])
@@ -357,6 +406,7 @@ watch(selectedVariant, () => { if (activeSeg.value !== null) { const data = mock
 watch(() => settings.value.sortBy, mode => applySort(mode))
 watch(() => [...settings.value.variation, settings.value.colorMode, settings.value.ref], () => { if (activeSeg.value !== null) drawWave() }, { deep: true })
 watch(witnesses, () => {
+  if (alignMatrix.value) return   // matrix watcher owns layout when real data is present
   const ids = witnesses.value.map(w => w.id)
   tree.value = upgma(ids, storeGetSegText)
   const order = leafOrder(tree.value)
@@ -364,8 +414,45 @@ watch(witnesses, () => {
   drawDendro()
 }, { deep: true })
 
+// When a real alignment matrix arrives, rebuild rows (anchor lines) and columns
+watch(alignMatrix, (m) => {
+  if (!m) return
+  // Rows = one per anchor line
+  segs.value = m.anchor_lines.map((_l, i) => `row-${i}`)
+  // Columns = witnesses from the matrix; default order is a UPGMA tree on real scores.
+  // Sample ~24 rows spread across the whole anchor range (not just the top 8),
+  // because most witnesses only align further down, so the first rows are mostly gaps.
+  const ids = m.witnesses
+  const nRows = m.anchor_lines.length
+  const nSamples = Math.min(24, nRows)
+  const sampleIdx = nRows <= nSamples
+    ? Array.from({ length: nRows }, (_, i) => i)
+    : Array.from({ length: nSamples }, (_, i) => Math.floor(i * nRows / nSamples))
+  tree.value = upgma(ids, (id, si) => {
+    const cell = m.cells[id] ? m.cells[id][si] : null
+    return cell ? cell.text : ''
+  }, sampleIdx)
+  const order = leafOrder(tree.value)
+  // The column id MUST equal the matrix cell key (used by getAlignScore/getSegText).
+  // We only borrow the display name from the store witness if one matches.
+  const byId = id => {
+    const w = witnesses.value.find(x => x.id === id)
+    return { id, name: w ? w.name : id }
+  }
+  colOrder.value = order.map(byId).filter(Boolean)
+  // Anchor first if present
+  const anchor = colOrder.value.find(w => w.id === m.anchor_id)
+  if (anchor) {
+    colOrder.value = [anchor, ...colOrder.value.filter(w => w.id !== m.anchor_id)]
+  }
+  activeSeg.value = null
+  wavePath.value = null
+  setTimeout(drawDendro, 30)
+}, { immediate: false })
+
 // ── Mount ────────────────────────────────────────────────────────────────────
 onMounted(() => {
+  if (alignMatrix.value) return   // matrix watcher will set up layout
   const ids = witnesses.value.map(w => w.id)
   tree.value = upgma(ids, storeGetSegText)
   const order = leafOrder(tree.value)
@@ -401,6 +488,14 @@ defineExpose({ segs, colOrder, tree })
 .col-wit.dragging { opacity:.4;cursor:grabbing; }
 .col-wit.col-drag-over::before { content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--ink);z-index:10; }
 .col-badge { width:34px;height:34px;border-radius:50%;background:#e4e4e4;border:1.5px solid #bbb;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#333;cursor:pointer;flex-shrink:0;transition:background .1s; }
+.col-badge-wrap { position:relative; display:flex; flex-direction:column; align-items:center; }
+.col-hide-btn { position:absolute; top:-3px; right:50%; transform:translateX(18px); width:14px; height:14px; border-radius:50%; background:var(--bg-panel); border:1px solid var(--border2); color:var(--ink3); font-size:10px; line-height:1; display:flex; align-items:center; justify-content:center; cursor:pointer; opacity:0; transition:opacity .1s; }
+.col-wit:hover .col-hide-btn { opacity:1; }
+.col-hide-btn:hover { background:var(--ink); color:#fff; border-color:var(--ink); }
+.col-wit.col-selected { background:rgba(28,26,23,0.05); border-radius:6px; }
+.col-wit.col-selected .col-badge { box-shadow:0 0 0 2px var(--ink); }
+.col-show-hidden { font-family:var(--mono); font-size:10px; color:var(--ink2); background:var(--bg); border:1px solid var(--border2); border-radius:4px; padding:3px 8px; cursor:pointer; }
+.col-show-hidden:hover { background:var(--bg-hover); }
 .col-badge.active { background:var(--ink);color:#fff;border-color:var(--ink); }
 .col-badge.cb0 { background:#e4e4e4; } .col-badge.cb1 { background:#f4c4b4;border-color:#e09880; } .col-badge.cb2 { background:#bce0b8;border-color:#88c480; } .col-badge.cb3 { background:#b4cce8;border-color:#80a8d4; } .col-badge.cb4 { background:#f0e4a4;border-color:#d4c464; } .col-badge.cb5 { background:#d4bce0;border-color:#b490cc; }
 .col-segs { display:flex;flex-direction:column;gap:2px;padding:2px 3px;width:100%; }

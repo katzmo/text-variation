@@ -116,9 +116,9 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useStore } from '../../composables/useStore.js'
-import { fetchAlignWitnesses, postRunAlignment, fetchInspectAlignment, postSaveAlignment } from '../../api.js'
+import { fetchAlignWitnesses, postRunAlignment, fetchInspectAlignment, postSaveAlignment, fetchAlignMatrix } from '../../api.js'
 
-const { witnesses } = useStore()
+const { witnesses, alignMatrix } = useStore()
 const running    = ref(false)
 const status     = ref('')
 const witList    = ref([])
@@ -156,6 +156,9 @@ async function runAlignment() {
   running.value = true; status.value = 'Running alignment…'; results.value = null
   try {
     results.value = await postRunAlignment(anchorId.value, threshold.value)
+    // Pull the anchor-indexed grid into the store so the collation heatmap uses real data
+    status.value = 'Loading alignment grid…'
+    try { alignMatrix.value = await fetchAlignMatrix(400) } catch(e) { /* heatmap stays on fallback */ }
   } catch(e) {
     // Client-side stub
     const witnesses_stats = {}

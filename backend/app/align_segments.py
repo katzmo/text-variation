@@ -60,8 +60,90 @@ def clean_line_text(el) -> str:
 
 # ── Witness loading ────────────────────────────────────────────────────────────
 
+# Tags whose text content is editorial noise, stripped when reading lb-style lines
+_INLINE_DROP = {'note', 'del'}
+
+
+def _clean_text_string(text: str) -> str:
+    """Lowercase, strip punctuation, collapse whitespace."""
+    text = re.sub(r'[^\w\s]', '', text.lower())
+    return re.sub(r'\s+', ' ', text).strip()
+
+
+def _strip_ns(tag) -> str:
+    """Return the local tag name without namespace."""
+    if isinstance(tag, str) and '}' in tag:
+        return tag.split('}', 1)[1]
+    return tag
+
+
+def load_witness_lb(tree) -> list:
+    """
+    Load lines from a milestone-style TEI where <lb n="N"/> marks line beginnings
+    and the line text is the tail content following each <lb/> up to the next one.
+    Returns list of (local_n: int, clean_text: str).
+    """
+    lines = []
+    # Find all lb elements in document order, namespace-agnostic
+    lbs = [el for el in tree.iter() if _strip_ns(el.tag) == 'lb']
+    for i, lb in enumerate(lbs):
+        n = lb.get('n')
+        if not n:
+            continue
+        # Collect text: the lb's tail, plus the text of following siblings/descendants
+        # until the next lb. We walk the document from this lb to the next lb.
+        parts = [lb.tail or '']
+        # Walk subsequent nodes in document order until we hit the next lb
+        nxt = lbs[i + 1] if i + 1 < len(lbs) else None
+        node = lb
+        # Use iter over the whole tree is expensive; instead walk siblings/parents
+        for el in lb.itersiblings():
+            if el is nxt:
+                break
+            if _strip_ns(el.tag) in _INLINE_DROP:
+                parts.append(el.tail or '')
+                continue
+            # include element text and tail and descendants' text
+            parts.append(_element_text_until(el, nxt))
+            if nxt is not None and _contains(el, nxt):
+                break
+        text = _clean_text_string(''.join(parts))
+        if text:
+            try:
+                lines.append((int(n), text))
+            except ValueError:
+                pass
+    return lines
+
+
+def _element_text_until(el, stop) -> str:
+    """Concatenate text of el and descendants and tails, stopping at `stop`."""
+    parts = []
+    for node in el.iter():
+        if node is stop:
+            break
+        if _strip_ns(node.tag) in _INLINE_DROP:
+            continue
+        parts.append(node.text or '')
+    parts.append(el.tail or '')
+    return ''.join(parts)
+
+
+def _contains(el, target) -> bool:
+    """True if target is a descendant of el."""
+    if target is None:
+        return False
+    for node in el.iter():
+        if node is target:
+            return True
+    return False
+
+
 def load_witness(path: Path) -> list:
-    """Return list of (local_n: int, clean_text: str) for each <l>."""
+    """
+    Return list of (local_n: int, clean_text: str).
+    Tries <l> container style first; if none found, falls back to <lb/> milestone style.
+    """
     tree = etree.parse(str(path))
     lines = []
     for l in tree.findall('.//l'):
@@ -72,6 +154,9 @@ def load_witness(path: Path) -> list:
                 lines.append((int(n), text))
             except ValueError:
                 pass
+    if not lines:
+        # Milestone style (lb markers with floating tail text)
+        lines = load_witness_lb(tree)
     return lines
 
 
@@ -145,25 +230,46 @@ def align_witness(
     threshold: float = 0.35,
     top_k: int = 15,
     min_word_len: int = 3,
+    anchor_sets: list = None,
 ) -> list:
     """
     Align a witness against the anchor.
     Returns list of dicts with keys:
       witness_n, anchor_n (None if unaligned), anchor_pos, score, text, anchor_text
+
+    anchor_sets: optional precomputed list of word-sets for each anchor line.
+    Passing it avoids rebuilding the anchor sets on every comparison, which is a
+    large speed-up when aligning many witnesses against the same anchor.
     """
+    # Precompute anchor word sets once (caller can also pass them in)
+    if anchor_sets is None:
+        anchor_sets = [set(t.split()) for (_n, t) in anchor_lines]
+
     raw_matches: list = []
     for wi, (wn, wt) in enumerate(witness_lines):
+        w_words = wt.split()
         cands: dict = {}
-        for w in wt.split():
-            if len(w) > min_word_len and w in anchor_idx:
-                for pos in anchor_idx[w]:
-                    cands[pos] = cands.get(pos, 0) + 1
+        for w in w_words:
+            if len(w) > min_word_len:
+                posting = anchor_idx.get(w)
+                if posting:
+                    for pos in posting:
+                        cands[pos] = cands.get(pos, 0) + 1
         if not cands:
             continue
+        # Precompute the witness line's word set once, reuse for all candidates
+        wset = set(w_words)
         top = sorted(cands.items(), key=lambda x: -x[1])[:top_k]
         best_pos, best_score = -1, 0.0
         for pos, _ in top:
-            s = jaccard(wt, anchor_lines[pos][1])
+            aset = anchor_sets[pos]
+            if not wset and not aset:
+                s = 1.0
+            elif not wset or not aset:
+                s = 0.0
+            else:
+                inter = len(wset & aset)
+                s = inter / (len(wset) + len(aset) - inter)
             if s > best_score:
                 best_score = s
                 best_pos = pos
@@ -216,21 +322,35 @@ def alignment_stats(alignment: list, threshold: float) -> dict:
 
 
 def save_augmented_tei(source_path: Path, dest_path: Path, alignment: list, witness_id: str):
-    """Write TEI with xml:id added to each <l>. aligned → line-NNNNN, else line-WID-NNNNN."""
+    """Write TEI with xml:id added to each line. aligned → line-NNNNN, else line-WID-NNNNN.
+    Handles both <l> container style and <lb/> milestone style."""
     n_to_anchor: dict = {a["witness_n"]: a["anchor_n"] for a in alignment}
     tree = etree.parse(str(source_path))
     XML_NS = "http://www.w3.org/XML/1998/namespace"
-    for l in tree.findall('.//l'):
-        n_str = l.get('n')
+
+    def tag_element(el):
+        n_str = el.get('n')
         if not n_str:
-            continue
+            return
         try:
             wn = int(n_str)
         except ValueError:
-            continue
+            return
         anchor_n = n_to_anchor.get(wn)
         xml_id = f"line-{anchor_n:05d}" if anchor_n is not None else f"line-{witness_id}-{wn:05d}"
-        l.set(f"{{{XML_NS}}}id", xml_id)
+        el.set(f"{{{XML_NS}}}id", xml_id)
+
+    l_elements = tree.findall('.//l')
+    if l_elements:
+        for l in l_elements:
+            tag_element(l)
+    else:
+        # Milestone style: tag the <lb/> elements
+        for el in tree.iter():
+            tag = el.tag
+            if isinstance(tag, str) and (tag == 'lb' or tag.endswith('}lb')):
+                tag_element(el)
+
     tree.write(str(dest_path), xml_declaration=True, encoding="UTF-8", pretty_print=False)
 
 

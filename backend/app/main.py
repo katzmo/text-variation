@@ -9,6 +9,10 @@ Endpoints:
   GET  /api/stemma              → UPGMA dendrogram
   POST /api/upload              → upload TEI/txt files + optional CSV metadata
   POST /api/upload/confirm      → confirm metadata and finalise witness set
+  GET  /api/align/witnesses     → witnesses available for alignment + line counts
+  POST /api/align/run           → run line alignment against an anchor
+  GET  /api/align/inspect/{id}  → paginated alignment results for one witness
+  POST /api/align/save          → write augmented TEI files
 """
 
 import os, json, math, csv, io, shutil
@@ -344,7 +348,11 @@ async def confirm_upload(req: ConfirmRequest):
         src = UPLOAD_DIR / w.filename
         if not src.exists():
             raise HTTPException(400, f"Staged file not found: {w.filename}")
-        dst = DATA_DIR / w.filename
+        # Save the file named after the clean witness id (e.g. M1767.xml), not the
+        # raw upload filename, so path.stem == w.id consistently across the backend.
+        ext = ".xml" if w.filename.lower().endswith(".xml") else ".txt"
+        safe_id = "".join(c for c in w.id if c.isalnum() or c in "-_") or w.filename
+        dst = DATA_DIR / f"{safe_id}{ext}"
         shutil.copy2(src, dst)
         meta[w.id] = {
             "name":        w.name,
@@ -363,3 +371,193 @@ async def confirm_upload(req: ConfirmRequest):
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+# ── Alignment ──────────────────────────────────────────────────────
+# In-memory store of the most recent alignment run, keyed by witness id.
+_ALIGN_CACHE: dict = {}
+_ALIGN_ANCHOR: dict = {"id": None}
+
+# Cache of parsed witness lines so each file is read from disk only once.
+# Keyed by witness id; value is (mtime, lines). Re-parses only if the file changed.
+_LINES_CACHE: dict = {}
+
+from . import align_segments as _align
+
+
+def _load_lines_cached(path: Path) -> list:
+    """Load (and cache) the parsed lines for a witness file."""
+    wid = path.stem
+    try:
+        mtime = path.stat().st_mtime
+    except OSError:
+        mtime = 0
+    cached = _LINES_CACHE.get(wid)
+    if cached and cached[0] == mtime:
+        return cached[1]
+    lines = _align.load_witness(path)
+    _LINES_CACHE[wid] = (mtime, lines)
+    return lines
+
+
+@app.get("/api/align/witnesses")
+def align_witnesses():
+    """List witnesses available for alignment with their line counts."""
+    result = []
+    for f in sorted(DATA_DIR.glob("*.xml")):
+        if f.stem.startswith("_"):
+            continue
+        try:
+            lines = _load_lines_cached(f)
+            result.append({"id": f.stem, "line_count": len(lines)})
+        except Exception:
+            result.append({"id": f.stem, "line_count": 0})
+    # Sort by line count descending so the longest (suggested anchor) is first
+    result.sort(key=lambda w: -w["line_count"])
+    return result
+
+
+class AlignRunRequest(BaseModel):
+    anchor_id: str
+    threshold: float = 0.35
+    top_k: int = 15
+
+
+@app.post("/api/align/run")
+def align_run(req: AlignRunRequest):
+    """Run alignment of every witness against the chosen anchor."""
+    anchor_path = DATA_DIR / f"{req.anchor_id}.xml"
+    if not anchor_path.exists():
+        raise HTTPException(404, f"Anchor {req.anchor_id} not found")
+
+    anchor_lines = _load_lines_cached(anchor_path)
+    if not anchor_lines:
+        raise HTTPException(400, f"Anchor {req.anchor_id} has no readable lines")
+    anchor_idx = _align.build_index(anchor_lines)
+    anchor_sets = [set(t.split()) for (_n, t) in anchor_lines]  # built once, reused
+
+    _ALIGN_CACHE.clear()
+    _ALIGN_ANCHOR["id"] = req.anchor_id
+    witnesses_stats = {}
+
+    for f in sorted(DATA_DIR.glob("*.xml")):
+        if f.stem.startswith("_"):
+            continue
+        wid = f.stem
+        if wid == req.anchor_id:
+            # The anchor aligns perfectly to itself
+            alignment = [
+                {"witness_n": n, "anchor_n": n, "anchor_pos": i,
+                 "score": 1.0, "text": t, "anchor_text": t}
+                for i, (n, t) in enumerate(anchor_lines)
+            ]
+        else:
+            lines = _load_lines_cached(f)
+            alignment = _align.align_witness(
+                lines, anchor_lines, anchor_idx,
+                threshold=req.threshold, top_k=req.top_k,
+                anchor_sets=anchor_sets,
+            )
+        _ALIGN_CACHE[wid] = alignment
+        witnesses_stats[wid] = _align.alignment_stats(alignment, req.threshold)
+
+    return {
+        "anchor_id": req.anchor_id,
+        "threshold": req.threshold,
+        "witnesses": witnesses_stats,
+    }
+
+
+@app.get("/api/align/inspect/{witness_id}")
+def align_inspect(witness_id: str, limit: int = 100, offset: int = 0):
+    """Return paginated alignment results for one witness."""
+    if witness_id not in _ALIGN_CACHE:
+        raise HTTPException(404, "No alignment found. Run alignment first.")
+    alignment = _ALIGN_CACHE[witness_id]
+    page = alignment[offset:offset + limit]
+    return {
+        "witness_id": witness_id,
+        "anchor_id": _ALIGN_ANCHOR["id"],
+        "total": len(alignment),
+        "offset": offset,
+        "limit": limit,
+        "lines": page,
+    }
+
+
+@app.get("/api/align/matrix")
+def align_matrix(max_rows: int = 0):
+    """
+    Return the most recent alignment as an anchor-indexed grid for the heatmap.
+    Rows are anchor lines (in anchor order). For each row, every witness either
+    has an aligned line (with its similarity score and text) or a gap (null).
+
+    Shape:
+    {
+      "anchor_id": "BZ430",
+      "witnesses": ["BZ430", "BZ449", ...],   # column order
+      "anchor_lines": [{"n": 1, "text": "..."}, ...],
+      "cells": {
+         "BZ449": [ {"score": 0.55, "text": "..."} | null, ... ],  # one per anchor row
+         ...
+      }
+    }
+    max_rows: if > 0, cap the number of anchor rows returned (0 = all).
+    """
+    if not _ALIGN_CACHE or not _ALIGN_ANCHOR["id"]:
+        raise HTTPException(400, "No alignment to read. Run alignment first.")
+    anchor_id = _ALIGN_ANCHOR["id"]
+    anchor_alignment = _ALIGN_CACHE.get(anchor_id, [])
+
+    # Anchor rows, in order. Each anchor line is identified by its anchor_pos.
+    anchor_lines = [{"n": a["witness_n"], "text": a["text"]} for a in anchor_alignment]
+    n_rows = len(anchor_lines)
+    if max_rows and n_rows > max_rows:
+        n_rows = max_rows
+        anchor_lines = anchor_lines[:n_rows]
+
+    witnesses = sorted(_ALIGN_CACHE.keys())
+    cells = {}
+    for wid in witnesses:
+        row = [None] * n_rows
+        if wid == anchor_id:
+            for pos in range(n_rows):
+                row[pos] = {"score": 1.0, "text": anchor_alignment[pos]["text"]}
+        else:
+            for a in _ALIGN_CACHE[wid]:
+                pos = a.get("anchor_pos")
+                if pos is not None and pos < n_rows:
+                    # Keep the best-scoring witness line if several map here
+                    prev = row[pos]
+                    if prev is None or a["score"] > prev["score"]:
+                        row[pos] = {"score": a["score"], "text": a["text"]}
+        cells[wid] = row
+
+    return {
+        "anchor_id": anchor_id,
+        "witnesses": witnesses,
+        "anchor_lines": anchor_lines,
+        "cells": cells,
+    }
+
+
+@app.post("/api/align/save")
+def align_save():
+    """Write augmented TEI files for the most recent alignment run."""
+    if not _ALIGN_CACHE or not _ALIGN_ANCHOR["id"]:
+        raise HTTPException(400, "No alignment to save. Run alignment first.")
+    out_dir = DATA_DIR / "_augmented"
+    out_dir.mkdir(exist_ok=True)
+    count = 0
+    for wid, alignment in _ALIGN_CACHE.items():
+        src = DATA_DIR / f"{wid}.xml"
+        if not src.exists():
+            continue
+        dest = out_dir / f"{wid}.xml"
+        try:
+            _align.save_augmented_tei(src, dest, alignment, wid)
+            count += 1
+        except Exception:
+            pass
+    return {"status": "ok", "count": count, "dir": str(out_dir)}
+

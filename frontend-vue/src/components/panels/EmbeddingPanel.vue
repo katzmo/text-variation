@@ -67,6 +67,7 @@ function draw() {
   const s = d3.select(svg).attr('width', W).attr('height', H)
   s.selectAll('*').remove()
   const g = s.append('g').attr('transform', `translate(${margin.left},${margin.top})`)
+
   const n = wits.length
   for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
     if (wits[i].source === wits[j].source && wits[i].affiliation === wits[j].affiliation)

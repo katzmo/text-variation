@@ -32,9 +32,11 @@ function draw() {
   const margin = { left: 8, right: 8, top: 6, bottom: 18 }
   const iW = W - margin.left - margin.right
 
-  const years = witnesses.value.map(w => w.year)
+  const years = witnesses.value.map(w => w.year).filter(y => y != null && !isNaN(y))
+  const minY = years.length ? Math.floor(Math.min(...years) / 100) * 100 : 1000
+  const maxY = years.length ? Math.ceil(Math.max(...years) / 100) * 100 : 1900
   const xScale = d3.scaleLinear()
-    .domain([Math.floor(Math.min(...years) / 100) * 100, Math.ceil(Math.max(...years) / 100) * 100])
+    .domain([minY, maxY === minY ? minY + 100 : maxY])
     .range([0, iW])
 
   const s = d3.select(svg).attr('width', W).attr('height', H)
@@ -51,7 +53,9 @@ function draw() {
   })
 
   witnesses.value.forEach(w => {
+    if (w.year == null || isNaN(w.year)) return   // skip witnesses with no date
     const x = xScale(w.year)
+    if (x == null || isNaN(x)) return
     const isSel = w.id === selectedWit.value
     const tickH = 14
     const tg = g.append('g').attr('transform',`translate(${x},0)`).style('cursor','pointer')

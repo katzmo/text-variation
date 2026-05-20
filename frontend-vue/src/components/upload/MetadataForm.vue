@@ -17,10 +17,7 @@
             <td><input class="meta-input" v-model.number="m.lat" type="number" step="0.1" style="width:60px"/></td>
             <td><input class="meta-input" v-model.number="m.lng" type="number" step="0.1" style="width:60px"/></td>
             <td>
-              <select class="meta-select" v-model="m.affiliation" style="width:100px">
-                <option>Protestant</option><option>Evangelical</option><option>Catholic</option>
-                <option>Anglican</option><option>Inter-denom.</option><option>Other</option>
-              </select>
+              <input class="meta-input" v-model="m.affiliation" placeholder="—" style="width:100px"/>
             </td>
             <td><input class="meta-input" v-model="m.source" style="width:140px"/></td>
           </tr>
