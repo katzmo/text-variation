@@ -13,13 +13,33 @@ services:
     restart: unless-stopped
 
   frontend:
-    build: ./frontend-vue
+    build:
+      target: build
+      context: ./frontend-vue
     container_name: kat-frontend
     ports:
       - "3000:80"
     depends_on:
       - backend
     restart: unless-stopped
+
+  frontend-dev:
+    build:
+      target: dev
+      context: ./frontend-vue
+    container_name: kat-frontend-dev
+    environment:
+      - NODE_ENV=development
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend-vue:/app
+      - /app/node_modules
+    tty: true
+    depends_on:
+      - backend
+    restart: unless-stopped
+    profiles: ["dev"]
 
 volumes:
   kat-data:
