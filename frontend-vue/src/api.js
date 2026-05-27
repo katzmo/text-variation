@@ -24,8 +24,10 @@ export async function postCollate(segmentId, witnessIds) {
 
 export async function postUploadFiles(files, companionCsv) {
   const formData = new FormData()
-  files.forEach(f => {
-    const blob = new Blob([f.content], { type: f.type === 'xml' ? 'application/xml' : 'text/plain' })
+  files.forEach((f) => {
+    const blob = new Blob([f.content], {
+      type: f.type === 'xml' ? 'application/xml' : 'text/plain',
+    })
     formData.append('files', blob, f.name)
   })
   if (companionCsv) {
