@@ -1,0 +1,634 @@
+=== python lab.py --list ===
+Available configs:
+  baseline         {'window': 1, 'similarity': 'jaccard', 'strategy': 'lis'}
+  sections5        {'window': 5, 'similarity': 'jaccard', 'strategy': 'lis'}
+  sections10       {'window': 10, 'similarity': 'jaccard', 'strategy': 'lis'}
+  dice             {'window': 1, 'similarity': 'dice', 'strategy': 'lis'}
+  bigram           {'window': 1, 'similarity': 'bigram', 'strategy': 'lis'}
+  levenshtein      {'window': 1, 'similarity': 'levenshtein', 'strategy': 'lis'}
+  combined         {'window': 1, 'similarity': 'combined', 'strategy': 'lis'}
+  banded           {'window': 1, 'similarity': 'jaccard', 'strategy': 'lis', 'band_frac': 0.15}
+  positional       {'window': 1, 'similarity': 'jaccard', 'strategy': 'lis', 'pos_weight': 0.3}
+  nw               {'window': 1, 'similarity': 'jaccard', 'strategy': 'nw'}
+  sections5_lev    {'window': 5, 'similarity': 'levenshtein', 'strategy': 'lis'}
+
+=== python lab.py (all configs) ===
+NOTE: This command was run but the 'nw' (Needleman-Wunsch) config was killed
+after 12+ minutes because the DP matrix for the largest pair (M1896 17866 lines
+vs M1767 33984 lines) requires several GB of memory and hours of compute.
+Individual configs below cover all configs needed for the plots.
+
+=== python lab.py --config baseline ===
+Loading corpus...
+  loaded BZ430: 496 lines
+  loaded BZ449: 9214 lines
+  loaded BZ644: 13911 lines
+  loaded LONDON OR5260: 5824 lines
+  loaded M1731: 9847 lines
+  loaded M1767: 33984 lines
+  loaded M1768: 6438 lines
+  loaded M1769: 6798 lines
+  loaded M1775: 1750 lines
+  loaded M1896: 17866 lines
+  loaded M2644: 5996 lines
+  loaded M2855: 6349 lines
+  loaded M2899: 5634 lines
+  loaded M3071: 6186 lines
+  loaded M3380: 12425 lines
+  loaded M3519: 6387 lines
+  loaded M3520: 11702 lines
+  loaded M5587: 7516 lines
+  loaded M6605: 6819 lines
+  loaded M6686: 798 lines
+  loaded M8232: 15270 lines
+  loaded OX E: 10410 lines
+  loaded V887: 6748 lines
+  loaded V901: 7412 lines
+  loaded V913: 7622 lines
+  loaded V917: 6721 lines
+  loaded W243: 5454 lines
+  loaded W246: 4188 lines
+  loaded W574: 5287 lines
+
+Comparing configs   witness=M1896  anchor=M1767
+
+config    rate   aligned  mean_sc  mono  anc_cov  time 
+--------  -----  -------  -------  ----  -------  -----
+baseline  18.9%  3374     0.505    1.00  9.9%     0.46s
+
+Agreement with baseline (same target where both align):
+config  agree
+------  -----
+
+Sample matches for 'baseline' (score | witness text | anchor text):
+  1.000  կու ի վր երկրի                                  |  կու ի վր երկրի
+  1.000  տոնէիցն                                         |  տոնէիցն
+  1.000  յիստակ էր                                       |  յիստակ էր
+  1.000  դաշտին                                          |  դաշտին
+  1.000  սբս իւր ամէն                                    |  սբս իւր ամէն
+  1.000  րոսի արշաւելոյն                                 |  րոսի արշաւելոյն
+  1.000  և եբեր ի հալպ                                   |  և եբեր ի հալպ
+  0.857  նր և ի գիշերին յայնմիկ ընդ մի                   |  նր և ի գիշերին ընդ մի
+
+=== python lab.py --config dice ===
+Loading corpus...
+  loaded BZ430: 496 lines
+  loaded BZ449: 9214 lines
+  loaded BZ644: 13911 lines
+  loaded LONDON OR5260: 5824 lines
+  loaded M1731: 9847 lines
+  loaded M1767: 33984 lines
+  loaded M1768: 6438 lines
+  loaded M1769: 6798 lines
+  loaded M1775: 1750 lines
+  loaded M1896: 17866 lines
+  loaded M2644: 5996 lines
+  loaded M2855: 6349 lines
+  loaded M2899: 5634 lines
+  loaded M3071: 6186 lines
+  loaded M3380: 12425 lines
+  loaded M3519: 6387 lines
+  loaded M3520: 11702 lines
+  loaded M5587: 7516 lines
+  loaded M6605: 6819 lines
+  loaded M6686: 798 lines
+  loaded M8232: 15270 lines
+  loaded OX E: 10410 lines
+  loaded V887: 6748 lines
+  loaded V901: 7412 lines
+  loaded V913: 7622 lines
+  loaded V917: 6721 lines
+  loaded W243: 5454 lines
+  loaded W246: 4188 lines
+  loaded W574: 5287 lines
+
+Comparing configs   witness=M1896  anchor=M1767
+
+config  rate   aligned  mean_sc  mono  anc_cov  time 
+------  -----  -------  -------  ----  -------  -----
+dice    25.7%  4599     0.612    1.00  13.5%    0.47s
+
+Sample matches for 'dice' (score | witness text | anchor text):
+  1.000  կու ի վր երկրի                                  |  կու ի վր երկրի
+  1.000  տոնէիցն                                         |  տոնէիցն
+  1.000  յիստակ էր                                       |  յիստակ էր
+  1.000  դաշտին                                          |  դաշտին
+  1.000  սբս իւր ամէն                                    |  սբս իւր ամէն
+  1.000  րոսի արշաւելոյն                                 |  րոսի արշաւելոյն
+  1.000  և եբեր ի հալպ                                   |  և եբեր ի հալպ
+  0.923  նր և ի գիշերին յայնմիկ ընդ մի                   |  նր և ի գիշերին ընդ մի
+
+=== python lab.py --config levenshtein ===
+Loading corpus...
+  loaded BZ430: 496 lines
+  loaded BZ449: 9214 lines
+  loaded BZ644: 13911 lines
+  loaded LONDON OR5260: 5824 lines
+  loaded M1731: 9847 lines
+  loaded M1767: 33984 lines
+  loaded M1768: 6438 lines
+  loaded M1769: 6798 lines
+  loaded M1775: 1750 lines
+  loaded M1896: 17866 lines
+  loaded M2644: 5996 lines
+  loaded M2855: 6349 lines
+  loaded M2899: 5634 lines
+  loaded M3071: 6186 lines
+  loaded M3380: 12425 lines
+  loaded M3519: 6387 lines
+  loaded M3520: 11702 lines
+  loaded M5587: 7516 lines
+  loaded M6605: 6819 lines
+  loaded M6686: 798 lines
+  loaded M8232: 15270 lines
+  loaded OX E: 10410 lines
+  loaded V887: 6748 lines
+  loaded V901: 7412 lines
+  loaded V913: 7622 lines
+  loaded V917: 6721 lines
+  loaded W243: 5454 lines
+  loaded W246: 4188 lines
+  loaded W574: 5287 lines
+
+Comparing configs   witness=M1896  anchor=M1767
+
+config       rate   aligned  mean_sc  mono  anc_cov  time   
+-----------  -----  -------  -------  ----  -------  -------
+levenshtein  20.5%  3670     0.510    1.00  10.8%    632.09s
+
+Sample matches for 'levenshtein' (score | witness text | anchor text):
+  1.000  կու ի վր երկրի                                  |  կու ի վր երկրի
+  1.000  տոնէիցն                                         |  տոնէիցն
+  1.000  յիստակ էր                                       |  յիստակ էր
+  1.000  դաշտին                                          |  դաշտին
+  1.000  սբս իւր ամէն                                    |  սբս իւր ամէն
+  1.000  րոսի արշաւելոյն                                 |  րոսի արշաւելոյն
+  1.000  և եբեր ի հալպ                                   |  և եբեր ի հալպ
+  0.857  նր և ի գիշերին յայնմիկ ընդ մի                   |  նր և ի գիշերին ընդ մի
+
+=== python lab.py --config combined ===
+Loading corpus...
+  loaded BZ430: 496 lines
+  loaded BZ449: 9214 lines
+  loaded BZ644: 13911 lines
+  loaded LONDON OR5260: 5824 lines
+  loaded M1731: 9847 lines
+  loaded M1767: 33984 lines
+  loaded M1768: 6438 lines
+  loaded M1769: 6798 lines
+  loaded M1775: 1750 lines
+  loaded M1896: 17866 lines
+  loaded M2644: 5996 lines
+  loaded M2855: 6349 lines
+  loaded M2899: 5634 lines
+  loaded M3071: 6186 lines
+  loaded M3380: 12425 lines
+  loaded M3519: 6387 lines
+  loaded M3520: 11702 lines
+  loaded M5587: 7516 lines
+  loaded M6605: 6819 lines
+  loaded M6686: 798 lines
+  loaded M8232: 15270 lines
+  loaded OX E: 10410 lines
+  loaded V887: 6748 lines
+  loaded V901: 7412 lines
+  loaded V913: 7622 lines
+  loaded V917: 6721 lines
+  loaded W243: 5454 lines
+  loaded W246: 4188 lines
+  loaded W574: 5287 lines
+
+NOTE: levenshtein and combined configs were killed because parsing artifacts
+in M1896 produce 6 'lines' with 44K-56K words (last <lb/> milestone capturing
+the rest of the document body). Word-level Levenshtein is O(m*n), so comparing
+two 56K-word 'lines' would require 3.1 billion DP cells (~5 hours).
+Fix applied to similarity.py: sim_word_levenshtein() now falls back to Jaccard
+when either unit has >300 words. Normal manuscript lines (5-30 words) unaffected.
+
+=== python lab.py --config levenshtein ===
+Loading corpus...
+  loaded BZ430: 496 lines
+  loaded BZ449: 9214 lines
+  loaded BZ644: 13911 lines
+  loaded LONDON OR5260: 5824 lines
+  loaded M1731: 9847 lines
+  loaded M1767: 33984 lines
+  loaded M1768: 6438 lines
+  loaded M1769: 6798 lines
+  loaded M1775: 1750 lines
+  loaded M1896: 17866 lines
+  loaded M2644: 5996 lines
+  loaded M2855: 6349 lines
+  loaded M2899: 5634 lines
+  loaded M3071: 6186 lines
+  loaded M3380: 12425 lines
+  loaded M3519: 6387 lines
+  loaded M3520: 11702 lines
+  loaded M5587: 7516 lines
+  loaded M6605: 6819 lines
+  loaded M6686: 798 lines
+  loaded M8232: 15270 lines
+  loaded OX E: 10410 lines
+  loaded V887: 6748 lines
+  loaded V901: 7412 lines
+  loaded V913: 7622 lines
+  loaded V917: 6721 lines
+  loaded W243: 5454 lines
+  loaded W246: 4188 lines
+  loaded W574: 5287 lines
+
+Comparing configs   witness=M1896  anchor=M1767
+
+config       rate   aligned  mean_sc  mono  anc_cov  time 
+-----------  -----  -------  -------  ----  -------  -----
+levenshtein  20.5%  3670     0.510    1.00  10.8%    0.90s
+
+Sample matches for 'levenshtein' (score | witness text | anchor text):
+  1.000  կու ի վր երկրի                                  |  կու ի վր երկրի
+  1.000  տոնէիցն                                         |  տոնէիցն
+  1.000  յիստակ էր                                       |  յիստակ էր
+  1.000  դաշտին                                          |  դաշտին
+  1.000  սբս իւր ամէն                                    |  սբս իւր ամէն
+  1.000  րոսի արշաւելոյն                                 |  րոսի արշաւելոյն
+  1.000  և եբեր ի հալպ                                   |  և եբեր ի հալպ
+  0.857  նր և ի գիշերին յայնմիկ ընդ մի                   |  նր և ի գիշերին ընդ մի
+
+=== python lab.py --config combined ===
+Loading corpus...
+  loaded BZ430: 496 lines
+  loaded BZ449: 9214 lines
+  loaded BZ644: 13911 lines
+  loaded LONDON OR5260: 5824 lines
+  loaded M1731: 9847 lines
+  loaded M1767: 33984 lines
+  loaded M1768: 6438 lines
+  loaded M1769: 6798 lines
+  loaded M1775: 1750 lines
+  loaded M1896: 17866 lines
+  loaded M2644: 5996 lines
+  loaded M2855: 6349 lines
+  loaded M2899: 5634 lines
+  loaded M3071: 6186 lines
+  loaded M3380: 12425 lines
+  loaded M3519: 6387 lines
+  loaded M3520: 11702 lines
+  loaded M5587: 7516 lines
+  loaded M6605: 6819 lines
+  loaded M6686: 798 lines
+  loaded M8232: 15270 lines
+  loaded OX E: 10410 lines
+  loaded V887: 6748 lines
+  loaded V901: 7412 lines
+  loaded V913: 7622 lines
+  loaded V917: 6721 lines
+  loaded W243: 5454 lines
+  loaded W246: 4188 lines
+  loaded W574: 5287 lines
+
+Comparing configs   witness=M1896  anchor=M1767
+
+config    rate   aligned  mean_sc  mono  anc_cov  time 
+--------  -----  -------  -------  ----  -------  -----
+combined  21.2%  3784     0.495    1.00  11.1%    0.95s
+
+Sample matches for 'combined' (score | witness text | anchor text):
+  1.000  կու ի վր երկրի                                  |  կու ի վր երկրի
+  1.000  տոնէիցն                                         |  տոնէիցն
+  1.000  յիստակ էր                                       |  յիստակ էր
+  1.000  դաշտին                                          |  դաշտին
+  1.000  սբս իւր ամէն                                    |  սբս իւր ամէն
+  1.000  րոսի արշաւելոյն                                 |  րոսի արշաւելոյն
+  1.000  և եբեր ի հալպ                                   |  և եբեր ի հալպ
+  0.857  նր և ի գիշերին յայնմիկ ընդ մի                   |  նր և ի գիշերին ընդ մի
+
+=== python lab.py --config sections5 ===
+Loading corpus...
+  loaded BZ430: 496 lines
+  loaded BZ449: 9214 lines
+  loaded BZ644: 13911 lines
+  loaded LONDON OR5260: 5824 lines
+  loaded M1731: 9847 lines
+  loaded M1767: 33984 lines
+  loaded M1768: 6438 lines
+  loaded M1769: 6798 lines
+  loaded M1775: 1750 lines
+  loaded M1896: 17866 lines
+  loaded M2644: 5996 lines
+  loaded M2855: 6349 lines
+  loaded M2899: 5634 lines
+  loaded M3071: 6186 lines
+  loaded M3380: 12425 lines
+  loaded M3519: 6387 lines
+  loaded M3520: 11702 lines
+  loaded M5587: 7516 lines
+  loaded M6605: 6819 lines
+  loaded M6686: 798 lines
+  loaded M8232: 15270 lines
+  loaded OX E: 10410 lines
+  loaded V887: 6748 lines
+  loaded V901: 7412 lines
+  loaded V913: 7622 lines
+  loaded V917: 6721 lines
+  loaded W243: 5454 lines
+  loaded W246: 4188 lines
+  loaded W574: 5287 lines
+
+Comparing configs   witness=M1896  anchor=M1767
+
+config     rate   aligned  mean_sc  mono  anc_cov  time 
+---------  -----  -------  -------  ----  -------  -----
+sections5  12.7%  455      0.405    1.00  6.7%     0.40s
+
+Sample matches for 'sections5' (score | witness text | anchor text):
+  0.667  և աշխարհակալ սուլտանն մէլէք շահն որ էր հայր և   |  որ էր հայր և ծնօղ ամ տիեզերաց այր բարի և ողոր 
+  0.625  պատրաստութի զօրացն փռան գաց բախեալ զնս և միաբա  |  պատրաստութի զաւրացն փռան գաց բախեալ զնս և միաբ
+  0.600  կողմանց եկն ի խառան զոր յառաջն տուեալ էր եղբօր  |  նայն կողմանց եկն ի խառան զոր յառաջն տուեալ էր 
+  0.600  նին որ և յարիւն դարձաւ մինչև ի հասարակ գիշերին  |  մն լուսնին որ և յարիւն դարձաւ մինչև ի հասարակ 
+  0.571  ծուց զմիմեանս բախէին երկո ցունց կողմանցն և յայ  |  թոռնիկ և ձայն տուեալ աջոյ թևին իւրոյ և հասանէր
+  0.565  իսկ յայսմ աւուրս ապիրատ ոմն որ էր մեծ իշխան հա  |  իսկ այսմ աւուրս ապիրատ ոմն որ էր մեծ իշխան հայ
+  0.560  և կրօնւրաց և ձեռնադրեցին զտէր սարգիս յաթոռ կթղ  |  քաղաքն որ կոչի հոնի ի ջահան գա ւառի վս զի էր ա
+  0.550  յարձակեցան ի վր իսմայելին և ընկեցին զնա ի ձիոյ  |  և յարձակեցան ի վր իսմայելին և ընկեցին զնա ի ձի
+
+=== python lab.py --config sections10 ===
+Loading corpus...
+  loaded BZ430: 496 lines
+  loaded BZ449: 9214 lines
+  loaded BZ644: 13911 lines
+  loaded LONDON OR5260: 5824 lines
+  loaded M1731: 9847 lines
+  loaded M1767: 33984 lines
+  loaded M1768: 6438 lines
+  loaded M1769: 6798 lines
+  loaded M1775: 1750 lines
+  loaded M1896: 17866 lines
+  loaded M2644: 5996 lines
+  loaded M2855: 6349 lines
+  loaded M2899: 5634 lines
+  loaded M3071: 6186 lines
+  loaded M3380: 12425 lines
+  loaded M3519: 6387 lines
+  loaded M3520: 11702 lines
+  loaded M5587: 7516 lines
+  loaded M6605: 6819 lines
+  loaded M6686: 798 lines
+  loaded M8232: 15270 lines
+  loaded OX E: 10410 lines
+  loaded V887: 6748 lines
+  loaded V901: 7412 lines
+  loaded V913: 7622 lines
+  loaded V917: 6721 lines
+  loaded W243: 5454 lines
+  loaded W246: 4188 lines
+  loaded W574: 5287 lines
+
+Comparing configs   witness=M1896  anchor=M1767
+
+config      rate  aligned  mean_sc  mono  anc_cov  time 
+----------  ----  -------  -------  ----  -------  -----
+sections10  5.2%  93       0.381    1.00  2.7%     0.40s
+
+Sample matches for 'sections10' (score | witness text | anchor text):
+  0.490  յանուանէ յուզէր զվասակ հայեցաւ քաջն եմրան և ետ  |  զվասակ հայեցաւ քաջն եմրամ և ետես զնա զի ահա գա
+  0.479  վաղակի առաքեսցես ինձ ըզ հարկս ժ աարւոյ և պատան  |  դանդ զորդիս ա զատաց քոց և գիր ծառայութե ինձ այ
+  0.471  պատկառէք և կամ երկնչիք և զած վաճառէք վս սնոտի   |  պսակ ի քէ և երա շխաւոր ես եմ ձեզ առ քս վս զի ո
+  0.458  քաղաքի հրամանաւ և կամօք փի լառտոսին և ոչ այ և   |  ամ ոչ լինէր ընդ ունելի այ և ոչ առ հաւատաց եալս
+  0.442  նին որ և յարիւն դարձաւ մինչև ի հասարակ գիշերին  |  մն լուսնին որ և յարիւն դարձաւ մինչև ի հասարակ 
+  0.429  կու ի վր երկրի յայսմ ամի մեռաւ և գուր գի թգրն   |  բագրատ թգրել ի վր ամ աշխարհին հոռոմոց արդ ի յա
+  0.415  նացն ձգեցին զպիղծ աբեղայն ընդ քարծայր բերդին և  |  զպիղծ աբեղայն ընդ քարծայր բերդին և ան դէն սատա
+  0.415  րն սկս գործել մեծ ամիրային իսմայի լի զնենգութի  |  բանակէն և տարեալ զնա ի զատ ի զաւրա ցն վս զրուց
+
+=== python lab.py --config positional ===
+Loading corpus...
+  loaded BZ430: 496 lines
+  loaded BZ449: 9214 lines
+  loaded BZ644: 13911 lines
+  loaded LONDON OR5260: 5824 lines
+  loaded M1731: 9847 lines
+  loaded M1767: 33984 lines
+  loaded M1768: 6438 lines
+  loaded M1769: 6798 lines
+  loaded M1775: 1750 lines
+  loaded M1896: 17866 lines
+  loaded M2644: 5996 lines
+  loaded M2855: 6349 lines
+  loaded M2899: 5634 lines
+  loaded M3071: 6186 lines
+  loaded M3380: 12425 lines
+  loaded M3519: 6387 lines
+  loaded M3520: 11702 lines
+  loaded M5587: 7516 lines
+  loaded M6605: 6819 lines
+  loaded M6686: 798 lines
+  loaded M8232: 15270 lines
+  loaded OX E: 10410 lines
+  loaded V887: 6748 lines
+  loaded V901: 7412 lines
+  loaded V913: 7622 lines
+  loaded V917: 6721 lines
+  loaded W243: 5454 lines
+  loaded W246: 4188 lines
+  loaded W574: 5287 lines
+
+Comparing configs   witness=M1896  anchor=M1767
+
+config      rate   aligned  mean_sc  mono  anc_cov  time 
+----------  -----  -------  -------  ----  -------  -----
+positional  20.7%  3706     0.495    1.00  10.9%    0.49s
+
+Sample matches for 'positional' (score | witness text | anchor text):
+  0.999  և եբեր ի հալպ                                   |  և եբեր ի հալպ
+  0.999  սբս իւր ամէն                                    |  սբս իւր ամէն
+  0.999  րոսի արշաւելոյն                                 |  րոսի արշաւելոյն
+  0.996  դաշտին                                          |  դաշտին
+  0.989  կու ի վր երկրի                                  |  կու ի վր երկրի
+  0.989  տոնէիցն                                         |  տոնէիցն
+  0.989  յիստակ էր                                       |  յիստակ էր
+  0.989  յաշխարհն իւրց                                   |  յաշխարհն իւրց
+
+=== python lab.py --config banded ===
+Loading corpus...
+  loaded BZ430: 496 lines
+  loaded BZ449: 9214 lines
+  loaded BZ644: 13911 lines
+  loaded LONDON OR5260: 5824 lines
+  loaded M1731: 9847 lines
+  loaded M1767: 33984 lines
+  loaded M1768: 6438 lines
+  loaded M1769: 6798 lines
+  loaded M1775: 1750 lines
+  loaded M1896: 17866 lines
+  loaded M2644: 5996 lines
+  loaded M2855: 6349 lines
+  loaded M2899: 5634 lines
+  loaded M3071: 6186 lines
+  loaded M3380: 12425 lines
+  loaded M3519: 6387 lines
+  loaded M3520: 11702 lines
+  loaded M5587: 7516 lines
+  loaded M6605: 6819 lines
+  loaded M6686: 798 lines
+  loaded M8232: 15270 lines
+  loaded OX E: 10410 lines
+  loaded V887: 6748 lines
+  loaded V901: 7412 lines
+  loaded V913: 7622 lines
+  loaded V917: 6721 lines
+  loaded W243: 5454 lines
+  loaded W246: 4188 lines
+  loaded W574: 5287 lines
+
+Comparing configs   witness=M1896  anchor=M1767
+
+config  rate   aligned  mean_sc  mono  anc_cov  time 
+------  -----  -------  -------  ----  -------  -----
+banded  23.5%  4207     0.499    1.00  12.4%    0.57s
+
+Sample matches for 'banded' (score | witness text | anchor text):
+  1.000  կու ի վր երկրի                                  |  կու ի վր երկրի
+  1.000  տոնէիցն                                         |  տոնէիցն
+  1.000  յիստակ էր                                       |  յիստակ էր
+  1.000  դաշտին                                          |  դաշտին
+  1.000  առնել ինչ                                       |  առնել ինչ
+  1.000  սբս իւր ամէն                                    |  սբս իւր ամէն
+  1.000  րոսի արշաւելոյն                                 |  րոսի արշաւելոյն
+  1.000  և եբեր ի հալպ                                   |  և եբեր ի հալպ
+
+=== --mode columns / --mode progressive (multi.py missing) ===
+NOTE: multi.py does not exist in this project. --mode columns and --mode progressive
+commands are skipped. Anchor-free alignment is not available in this version.
+
+=== python lab.py --all-pairs --config baseline ===
+Loading corpus...
+  loaded BZ430: 496 lines
+  loaded BZ449: 9214 lines
+  loaded BZ644: 13911 lines
+  loaded LONDON OR5260: 5824 lines
+  loaded M1731: 9847 lines
+  loaded M1767: 33984 lines
+  loaded M1768: 6438 lines
+  loaded M1769: 6798 lines
+  loaded M1775: 1750 lines
+  loaded M1896: 17866 lines
+  loaded M2644: 5996 lines
+  loaded M2855: 6349 lines
+  loaded M2899: 5634 lines
+  loaded M3071: 6186 lines
+  loaded M3380: 12425 lines
+  loaded M3519: 6387 lines
+  loaded M3520: 11702 lines
+  loaded M5587: 7516 lines
+  loaded M6605: 6819 lines
+  loaded M6686: 798 lines
+  loaded M8232: 15270 lines
+  loaded OX E: 10410 lines
+  loaded V887: 6748 lines
+  loaded V901: 7412 lines
+  loaded V913: 7622 lines
+  loaded V917: 6721 lines
+  loaded W243: 5454 lines
+  loaded W246: 4188 lines
+  loaded W574: 5287 lines
+
+All-pairs alignment rate (rows=witness, cols=anchor)   config=baseline
+
+wit \ anc      BZ430  BZ449  BZ644  LONDON OR5260  M1731  M1767  M1768  M1769  M1775  M1896  M2644  M2855  M2899  M3071  M3380  M3519  M3520  M5587  M6605  M6686  M8232  OX E  V887  V901  V913  V917  W243  W246  W574
+-------------  -----  -----  -----  -------------  -----  -----  -----  -----  -----  -----  -----  -----  -----  -----  -----  -----  -----  -----  -----  -----  -----  ----  ----  ----  ----  ----  ----  ----  ----
+BZ430          --     15%    14%    8%             14%    9%     9%     9%     6%     15%    8%     9%     9%     9%     12%    12%    13%    13%    8%     0%     12%    10%   3%    6%    5%    11%   8%    2%    5%  
+BZ449          1%     --     48%    20%            32%    7%     21%    21%    3%     32%    28%    30%    20%    19%    36%    25%    36%    23%    22%    2%     28%    32%   19%   28%   26%   21%   23%   18%   15% 
+BZ644          1%     33%    --     11%            19%    11%    12%    13%    2%     23%    15%    16%    13%    11%    22%    13%    20%    15%    14%    1%     19%    17%   8%    15%   12%   13%   11%   6%    8%  
+LONDON OR5260  1%     31%    25%    --             25%    9%     64%    42%    5%     33%    35%    36%    64%    48%    38%    39%    34%    44%    48%    5%     25%    35%   23%   21%   26%   39%   33%   24%   31% 
+M1731          1%     31%    26%    15%            --     14%    16%    19%    5%     42%    24%    25%    15%    16%    49%    23%    48%    21%    16%    0%     30%    38%   17%   42%   22%   17%   20%   12%   12% 
+M1767          0%     2%     5%     2%             5%     --     3%     3%     1%     11%    1%     2%     2%     2%     6%     2%     5%     4%     3%     0%     7%     3%    1%    2%    1%    4%    1%    0%    1%  
+M1768          1%     30%    26%    58%            24%    11%    --     42%    6%     35%    33%    34%    53%    49%    39%    39%    35%    45%    48%    5%     28%    33%   18%   20%   23%   38%   30%   20%   30% 
+M1769          1%     29%    25%    36%            27%    13%    40%    --     6%     37%    33%    35%    35%    39%    41%    47%    39%    57%    40%    5%     30%    39%   18%   21%   24%   46%   31%   16%   33% 
+M1775          2%     17%    16%    18%            26%    11%    21%    24%    --     21%    19%    19%    20%    21%    23%    24%    22%    25%    21%    0%     16%    29%   12%   19%   12%   23%   20%   12%   20% 
+M1896          0%     18%    20%    12%            25%    19%    14%    15%    2%     --     14%    15%    12%    14%    29%    15%    25%    18%    15%    2%     21%    22%   10%   16%   13%   15%   12%   5%    10% 
+M2644          1%     43%    33%    34%            39%    5%     35%    37%    6%     37%    --     70%    39%    33%    54%    48%    54%    38%    42%    5%     31%    49%   34%   38%   40%   37%   57%   43%   30% 
+M2855          1%     43%    34%    33%            38%    7%     34%    37%    5%     39%    66%    --     38%    32%    52%    46%    55%    39%    42%    6%     32%    47%   31%   36%   37%   37%   54%   39%   29% 
+M2899          1%     33%    30%    66%            26%    10%    61%    42%    6%     34%    42%    43%    --     47%    39%    43%    40%    47%    54%    5%     28%    37%   24%   24%   27%   40%   38%   27%   31% 
+M3071          1%     29%    24%    46%            25%    11%    51%    43%    6%     36%    32%    33%    43%    --     38%    39%    33%    45%    47%    4%     25%    32%   25%   20%   27%   41%   32%   20%   35% 
+M3380          0%     27%    24%    18%            39%    13%    21%    23%    3%     38%    27%    27%    18%    19%    --     27%    48%    25%    20%    3%     28%    39%   20%   28%   24%   23%   24%   14%   18% 
+M3519          1%     36%    26%    35%            34%    9%     39%    49%    7%     38%    46%    46%    38%    38%    52%    --     50%    53%    40%    5%     31%    53%   28%   29%   31%   52%   40%   30%   38% 
+M3520          1%     29%    23%    18%            41%    11%    19%    23%    4%     35%    28%    30%    20%    18%    50%    28%    --     24%    22%    4%     30%    42%   18%   30%   23%   23%   22%   14%   17% 
+M5587          1%     28%    26%    35%            27%    16%    40%    52%    6%     39%    31%    34%    36%    38%    41%    46%    37%    --     41%    5%     31%    39%   17%   20%   22%   45%   28%   15%   32% 
+M6605          1%     30%    27%    41%            23%    12%    46%    40%    6%     35%    37%    40%    44%    43%    36%    37%    36%    45%    --     5%     28%    35%   15%   20%   20%   37%   26%   16%   25% 
+M6686          0%     19%    18%    35%            3%     11%    39%    40%    1%     37%    39%    44%    34%    30%    51%    40%    55%    44%    40%    --     41%    40%   21%   3%    27%   40%   33%   19%   29% 
+M8232          0%     18%    18%    10%            21%    14%    13%    14%    2%     24%    13%    14%    11%    11%    24%    14%    24%    16%    14%    2%     --     19%   7%    13%   11%   14%   9%    4%    8%  
+OX E           1%     29%    22%    20%            36%    9%     21%    25%    5%     34%    28%    29%    20%    19%    46%    33%    47%    28%    23%    3%     27%    --    18%   28%   22%   26%   22%   16%   20% 
+V887           0%     26%    16%    20%            25%    3%     17%    18%    3%     24%    30%    30%    20%    22%    36%    26%    30%    18%    15%    2%     15%    27%   --    23%   57%   21%   40%   31%   21% 
+V901           0%     35%    27%    17%            55%    8%     17%    19%    5%     35%    31%    31%    18%    16%    46%    25%    46%    20%    19%    0%     25%    39%   21%   --    28%   17%   26%   19%   14% 
+V913           0%     31%    21%    20%            28%    4%     19%    21%    3%     27%    32%    31%    20%    22%    38%    26%    34%    22%    18%    3%     21%    30%   50%   27%   --    22%   35%   26%   21% 
+V917           1%     29%    25%    34%            26%    16%    37%    47%    6%     38%    34%    36%    34%    37%    43%    49%    40%    51%    37%    5%     31%    41%   22%   19%   25%   --    32%   19%   37% 
+W243           1%     39%    28%    35%            36%    5%     34%    38%    7%     36%    62%    62%    38%    35%    52%    46%    46%    37%    33%    5%     23%    41%   50%   35%   49%   39%   --    54%   35% 
+W246           0%     38%    20%    33%            28%    1%     30%    26%    5%     20%    62%    59%    36%    29%    41%    45%    39%    27%    26%    4%     13%    39%   50%   33%   46%   30%   70%   --    29% 
+W574           1%     26%    20%    34%            23%    8%     36%    42%    7%     30%    34%    34%    33%    41%    41%    46%    37%    44%    32%    5%     22%    38%   27%   19%   30%   47%   36%   24%   --  
+
+Tip: a good anchor is one that many witnesses align to well (a dense column).
+
+=== python lab.py --all-pairs --config dice ===
+Loading corpus...
+  loaded BZ430: 496 lines
+  loaded BZ449: 9214 lines
+  loaded BZ644: 13911 lines
+  loaded LONDON OR5260: 5824 lines
+  loaded M1731: 9847 lines
+  loaded M1767: 33984 lines
+  loaded M1768: 6438 lines
+  loaded M1769: 6798 lines
+  loaded M1775: 1750 lines
+  loaded M1896: 17866 lines
+  loaded M2644: 5996 lines
+  loaded M2855: 6349 lines
+  loaded M2899: 5634 lines
+  loaded M3071: 6186 lines
+  loaded M3380: 12425 lines
+  loaded M3519: 6387 lines
+  loaded M3520: 11702 lines
+  loaded M5587: 7516 lines
+  loaded M6605: 6819 lines
+  loaded M6686: 798 lines
+  loaded M8232: 15270 lines
+  loaded OX E: 10410 lines
+  loaded V887: 6748 lines
+  loaded V901: 7412 lines
+  loaded V913: 7622 lines
+  loaded V917: 6721 lines
+  loaded W243: 5454 lines
+  loaded W246: 4188 lines
+  loaded W574: 5287 lines
+
+All-pairs alignment rate (rows=witness, cols=anchor)   config=dice
+
+wit \ anc      BZ430  BZ449  BZ644  LONDON OR5260  M1731  M1767  M1768  M1769  M1775  M1896  M2644  M2855  M2899  M3071  M3380  M3519  M3520  M5587  M6605  M6686  M8232  OX E  V887  V901  V913  V917  W243  W246  W574
+-------------  -----  -----  -----  -------------  -----  -----  -----  -----  -----  -----  -----  -----  -----  -----  -----  -----  -----  -----  -----  -----  -----  ----  ----  ----  ----  ----  ----  ----  ----
+BZ430          --     27%    25%    21%            29%    18%    22%    24%    18%    29%    22%    22%    24%    19%    26%    25%    27%    29%    21%    3%     26%    25%   14%   18%   16%   27%   20%   15%   19% 
+BZ449          2%     --     65%    32%            47%    21%    33%    34%    7%     49%    44%    45%    33%    32%    55%    40%    56%    35%    35%    3%     45%    54%   41%   44%   46%   33%   40%   33%   29% 
+BZ644          1%     46%    --     20%            30%    18%    21%    21%    5%     34%    26%    27%    21%    20%    35%    23%    34%    23%    23%    2%     29%    31%   22%   26%   25%   21%   23%   19%   17% 
+LONDON OR5260  2%     50%    42%    --             37%    26%    79%    63%    11%    52%    56%    58%    78%    68%    58%    62%    57%    64%    71%    8%     44%    57%   45%   34%   48%   60%   56%   45%   55% 
+M1731          2%     46%    39%    23%            --     28%    24%    27%    8%     56%    34%    36%    24%    25%    64%    32%    66%    28%    26%    1%     43%    56%   35%   58%   39%   25%   32%   24%   21% 
+M1767          0%     8%     9%     6%             11%    --     7%     8%     2%     16%    7%     7%     6%     7%     13%    8%     13%    9%     8%     1%     11%    11%   5%    8%    7%    8%    6%    3%    6%  
+M1768          2%     47%    40%    72%            36%    27%    --     62%    11%    51%    53%    53%    68%    66%    55%    58%    55%    63%    68%    8%     43%    54%   39%   32%   43%   57%   50%   39%   50% 
+M1769          2%     46%    41%    56%            38%    29%    59%    --     12%    54%    53%    55%    55%    58%    59%    64%    58%    74%    61%    8%     48%    59%   40%   32%   43%   65%   51%   38%   54% 
+M1775          5%     33%    32%    34%            41%    25%    37%    42%    --     35%    33%    35%    36%    37%    37%    40%    39%    42%    37%    2%     30%    43%   28%   33%   28%   40%   36%   26%   35% 
+M1896          1%     30%    29%    20%            35%    26%    22%    23%    5%     --     24%    25%    19%    22%    40%    24%    39%    25%    23%    3%     30%    37%   23%   27%   26%   23%   23%   17%   18% 
+M2644          2%     64%    53%    53%            53%    26%    54%    56%    10%    60%    --     85%    56%    53%    75%    69%    76%    57%    60%    8%     55%    72%   60%   51%   63%   55%   75%   60%   51% 
+M2855          2%     64%    53%    52%            52%    27%    53%    56%    10%    60%    81%    --     53%    51%    73%    67%    75%    56%    60%    8%     55%    70%   56%   49%   60%   55%   73%   56%   49% 
+M2899          2%     52%    45%    81%            40%    27%    78%    65%    12%    51%    62%    62%    --     68%    58%    65%    62%    67%    74%    9%     46%    60%   47%   37%   49%   62%   59%   47%   55% 
+M3071          2%     48%    41%    65%            38%    28%    69%    63%    11%    53%    54%    55%    63%    --     57%    60%    55%    65%    69%    8%     43%    54%   46%   33%   48%   60%   53%   41%   56% 
+M3380          1%     43%    37%    29%            51%    27%    30%    33%    6%     52%    39%    39%    28%    29%    --     38%    65%    34%    31%    5%     41%    57%   38%   42%   40%   33%   36%   27%   29% 
+M3519          2%     57%    46%    56%            48%    30%    58%    66%    12%    57%    66%    67%    57%    57%    71%    --     71%    69%    62%    8%     53%    73%   52%   43%   54%   66%   62%   50%   58% 
+M3520          1%     46%    38%    30%            56%    27%    31%    34%    7%     53%    42%    43%    31%    30%    68%    41%    --     35%    34%    6%     44%    61%   38%   44%   41%   34%   37%   29%   29% 
+M5587          2%     44%    40%    53%            37%    29%    57%    68%    11%    53%    49%    50%    52%    56%    57%    61%    55%    --     60%    8%     46%    56%   36%   30%   40%   61%   46%   35%   50% 
+M6605          2%     48%    43%    60%            35%    26%    65%    61%    10%    51%    54%    57%    61%    63%    55%    58%    56%    64%    --     8%     45%    54%   36%   32%   40%   57%   47%   37%   48% 
+M6686          2%     32%    28%    54%            5%     30%    58%    62%    3%     55%    60%    62%    54%    52%    71%    63%    75%    65%    63%    --     59%    61%   43%   5%    49%   61%   55%   41%   54% 
+M8232          1%     31%    27%    19%            31%    20%    21%    24%    5%     34%    26%    27%    20%    19%    36%    25%    37%    25%    24%    4%     --     34%   21%   23%   25%   23%   22%   17%   17% 
+OX E           1%     48%    39%    32%            53%    26%    34%    39%    8%     55%    44%    45%    33%    33%    67%    46%    68%    40%    37%    5%     44%    --    39%   45%   43%   38%   39%   31%   33% 
+V887           1%     54%    40%    38%            49%    19%    36%    38%    8%     52%    53%    53%    38%    40%    64%    47%    63%    37%    35%    5%     43%    58%   --    46%   79%   38%   59%   50%   40% 
+V901           1%     53%    44%    27%            73%    25%    27%    29%    9%     54%    42%    42%    27%    27%    66%    37%    66%    29%    29%    1%     41%    61%   42%   --    47%   27%   38%   31%   25% 
+V913           1%     55%    42%    37%            48%    21%    36%    38%    7%     51%    51%    51%    36%    38%    62%    46%    61%    38%    36%    6%     44%    57%   71%   47%   --    38%   53%   43%   37% 
+V917           2%     46%    41%    53%            38%    31%    56%    66%    11%    54%    52%    54%    53%    57%    59%    66%    60%    68%    60%    8%     47%    60%   41%   31%   44%   --    51%   39%   57% 
+W243           2%     63%    52%    58%            53%    26%    56%    60%    12%    62%    82%    83%    58%    57%    76%    70%    74%    59%    58%    8%     51%    71%   72%   51%   72%   59%   --    68%   58% 
+W246           2%     68%    54%    59%            53%    17%    57%    57%    11%    61%    85%    84%    60%    57%    75%    74%    75%    58%    57%    8%     51%    74%   79%   52%   75%   58%   87%   --    57% 
+W574           2%     48%    40%    60%            38%    28%    60%    68%    12%    52%    59%    60%    58%    65%    64%    70%    63%    67%    61%    9%     43%    64%   52%   35%   53%   70%   61%   47%   --  
+
+Tip: a good anchor is one that many witnesses align to well (a dense column).
