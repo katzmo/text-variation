@@ -54,7 +54,7 @@ CONFIGS = {
     "sections5_lev": dict(window=5,  similarity="levenshtein", strategy="lis"),
 }
 
-COMMON = dict(threshold=0.35, top_k=15, min_word_len=3)
+COMMON = dict(threshold=0.1, top_k=5, min_word_len=3, pos_weight=0.01)
 
 
 def load_corpus(data_dir, tags_str):

@@ -65,9 +65,6 @@ def _load_milestone(tree):
     lines = []
     lbs = [el for el in tree.iter() if _local(el.tag) == "lb"]
     for i, lb in enumerate(lbs):
-        n = lb.get("n")
-        if not n:
-            continue
         nxt = lbs[i + 1] if i + 1 < len(lbs) else None
         parts = [lb.tail or ""]
         for el in lb.itersiblings():
@@ -81,10 +78,7 @@ def _load_milestone(tree):
                 break
         text = _clean("".join(parts))
         if text:
-            try:
-                lines.append((int(n), text))
-            except ValueError:
-                pass
+            lines.append(text)
     return lines
 
 
