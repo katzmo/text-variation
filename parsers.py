@@ -2,7 +2,7 @@
 parsers.py — read TEI witnesses into comparable units.
 
 Two things happen here:
-  1. load_segments(path, tags)  -> [clean_text, ...] one entry per segment
+  1. load_segments(path, tags)  -> xml_id, [clean_text, ...] one entry per segment
        Handles BOTH conventional <l>...</l> containers AND the milestone
        <lb n="1"/> style where text floats as tail content after the marker.
   2. group_units(lines, window) -> [unit, ...]      where a unit is a dict
@@ -89,8 +89,10 @@ def _load_milestone(tree):
 
 
 def load_segments(path, tags):
-    """Return [clean_text, ...] for one witness file."""
+    """Return (xml_id, [clean_text, ...]) for one witness file."""
     tree = etree.parse(str(path))
+    # Is there an ID?
+    xml_id = tree.getroot().get("{http://www.w3.org/XML/1998/namespace}id")
     # Is there a namespace?
     if xmlns := tree.getroot().nsmap.get(None):
         ns = "ns" # custom prefix for the default namespace
@@ -105,7 +107,7 @@ def load_segments(path, tags):
             segments.append(text)
     if not segments and "lb" in tags:
         segments = _load_milestone(tree)
-    return segments
+    return xml_id, segments
 
 
 def group_units(lines, window=1):

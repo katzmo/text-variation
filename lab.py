@@ -64,9 +64,9 @@ def load_corpus(data_dir, tags_str):
     tags = [tag.strip() for tag in tags_str.split(",")]
     corpus = {}
     for f in files:
-        # clean id = filename prefix before first dash/dot
-        wid = f.stem.split("-")[0].split(".")[0].upper()
-        segments = parsers.load_segments(f, tags)
+        xml_id, segments = parsers.load_segments(f, tags)
+        # clean id = xml:id or filename prefix before first dash/dot
+        wid = xml_id or f.stem.split("-")[0].split(".")[0]
         corpus[wid] = segments
         print(f"  loaded {wid}: {len(segments)} segments", file=sys.stderr)
     return corpus
