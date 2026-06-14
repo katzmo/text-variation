@@ -57,17 +57,18 @@ CONFIGS = {
 COMMON = dict(threshold=0.35, top_k=15, min_word_len=3)
 
 
-def load_corpus(data_dir):
+def load_corpus(data_dir, tags_str):
     files = sorted(Path(data_dir).glob("*.xml"))
     if not files:
         sys.exit(f"No .xml files in {data_dir}. Drop some TEI files there.")
+    tags = [tag.strip() for tag in tags_str.split(",")]
     corpus = {}
     for f in files:
         # clean id = filename prefix before first dash/dot
         wid = f.stem.split("-")[0].split(".")[0].upper()
-        lines = parsers.load_lines(f)
-        corpus[wid] = lines
-        print(f"  loaded {wid}: {len(lines)} lines", file=sys.stderr)
+        segments = parsers.load_segments(f, tags)
+        corpus[wid] = segments
+        print(f"  loaded {wid}: {len(segments)} segments", file=sys.stderr)
     return corpus
 
 
@@ -166,6 +167,7 @@ def cmd_all_pairs(corpus, cfg_name):
 def main():
     ap = argparse.ArgumentParser(description="Alignment experimentation harness")
     ap.add_argument("--data", default=str(DEFAULT_DATA), help="folder of .xml TEI files")
+    ap.add_argument("--tags", default="p,lg", help="tags to use as segments")
     ap.add_argument("--config", help="run a single named config")
     ap.add_argument("--all-pairs", action="store_true", help="every text as anchor")
     ap.add_argument("--list", action="store_true", help="list configs and exit")
@@ -179,7 +181,7 @@ def main():
         return
 
     print("Loading corpus...", file=sys.stderr)
-    corpus = load_corpus(args.data)
+    corpus = load_corpus(args.data, args.tags)
 
     if args.all_pairs:
         cmd_all_pairs(corpus, args.config or "baseline")
