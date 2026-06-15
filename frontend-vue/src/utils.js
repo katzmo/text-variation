@@ -72,7 +72,7 @@ export function upgma(ids, getTextFn, sampleIndices = null) {
       i: nodes.length,
       left: nodes[i],
       right: nodes[j],
-      h: md / 2,
+      h: Math.max(md / 2, nodes[i].h + 0.1, nodes[j].h + 0.1),
       leaves: [...nodes[i].leaves, ...nodes[j].leaves],
     }
     nodes.push(m)

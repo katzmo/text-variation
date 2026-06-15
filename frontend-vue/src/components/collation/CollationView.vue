@@ -379,6 +379,8 @@ function drawDendro() {
     const ly = node.left.left ? nodeY(node.left) : H - 10
     const ry = node.right.left ? nodeY(node.right) : H - 10
     const g = svg.append('g')
+
+    // Horizontal line between left and right children
     if (lx !== null && rx !== null)
       g.append('line')
         .attr('x1', lx)
@@ -387,6 +389,8 @@ function drawDendro() {
         .attr('y2', ny)
         .attr('stroke', '#aaa')
         .attr('stroke-width', 1.2)
+
+    // Vertical line for left child
     if (lx !== null)
       g.append('line')
         .attr('x1', lx)
@@ -395,6 +399,8 @@ function drawDendro() {
         .attr('y2', ly)
         .attr('stroke', '#aaa')
         .attr('stroke-width', 1.2)
+
+    // Vertical line for right child
     if (rx !== null)
       g.append('line')
         .attr('x1', rx)
@@ -403,6 +409,8 @@ function drawDendro() {
         .attr('y2', ry)
         .attr('stroke', '#aaa')
         .attr('stroke-width', 1.2)
+
+    // Recursively draw children
     draw(node.left)
     draw(node.right)
   }
