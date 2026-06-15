@@ -106,7 +106,8 @@ def sim_word_levenshtein(a, b):
 
 def sim_char_levenshtein(a, b):
     """Character-level edit distance, normalised to a similarity in [0, 1]."""
-    ta, tb = a.text, b.text
+    ta = a.text if isinstance(a, Bundle) else a
+    tb = b.text if isinstance(b, Bundle) else b
     m, n = len(ta), len(tb)
     if m == 0 and n == 0:
         return 1.0
@@ -121,6 +122,22 @@ def sim_char_levenshtein(a, b):
             cur[j] = min(cur[j - 1] + 1, prev[j] + 1, prev[j - 1] + cost)
         prev = cur
     return 1 - prev[n] / max(m, n)
+
+
+def sim_hybrid_levenshtein(a, b):
+    """
+    Combination of word-level edit distance boosted by character-level edit
+    distance for the words that differ, normalised to a similarity in [0, 1].
+    """
+    word_similarity = sim_word_levenshtein(a, b)
+    char_similarities = []
+    for w1, w2 in zip(a.words, b.words):
+        if w1 != w2:
+            char_similarities.append(sim_char_levenshtein(w1, w2))
+    # Average character similarity (default to 1 if no differing words)
+    char_similarity = sum(char_similarities) / len(char_similarities) if char_similarities else 1.0
+    # Additive hybrid score
+    return word_similarity + (1 - word_similarity) * char_similarity
 
 
 def make_combined(w_jaccard=0.5, w_lev=0.5):
@@ -140,5 +157,6 @@ SIMILARITIES = {
     "bigram": sim_bigram_jaccard,
     "levenshtein": sim_word_levenshtein,
     "levenshtein-char": sim_char_levenshtein,
+    "levenshtein-hybrid": sim_hybrid_levenshtein,
     "combined": make_combined(0.5, 0.5),
 }
