@@ -48,6 +48,7 @@ CONFIGS = {
     "combined":      dict(window=1,  similarity="combined",    strategy="lis"),
     # #6 order-aware character similarity
     "dice-char":      dict(window=1,  similarity="dice-char",  strategy="lis"),
+    "levenshtein-char": dict(window=1, similarity="levenshtein-char", strategy="lis"),
     # #4 positional preference
     "banded":        dict(window=1,  similarity="jaccard",     strategy="lis", band_frac=0.15),
     "positional":    dict(window=1,  similarity="jaccard",     strategy="lis", pos_weight=0.3),

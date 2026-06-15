@@ -104,6 +104,25 @@ def sim_word_levenshtein(a, b):
     return 1 - prev[n] / max(m, n)
 
 
+def sim_char_levenshtein(a, b):
+    """Character-level edit distance, normalised to a similarity in [0, 1]."""
+    ta, tb = a.text, b.text
+    m, n = len(ta), len(tb)
+    if m == 0 and n == 0:
+        return 1.0
+    if m == 0 or n == 0:
+        return 0.0
+    prev = list(range(n + 1))
+    for i in range(1, m + 1):
+        cur = [i] + [0] * n
+        wai = ta[i - 1]
+        for j in range(1, n + 1):
+            cost = 0 if wai == tb[j - 1] else 1
+            cur[j] = min(cur[j - 1] + 1, prev[j] + 1, prev[j - 1] + cost)
+        prev = cur
+    return 1 - prev[n] / max(m, n)
+
+
 def make_combined(w_jaccard=0.5, w_lev=0.5):
     """Weighted blend of Jaccard (set overlap) and word-Levenshtein (order)."""
     def sim(a, b):
@@ -120,5 +139,6 @@ SIMILARITIES = {
     "dice-char": sim_char_dice,
     "bigram": sim_bigram_jaccard,
     "levenshtein": sim_word_levenshtein,
+    "levenshtein-char": sim_char_levenshtein,
     "combined": make_combined(0.5, 0.5),
 }
