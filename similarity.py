@@ -8,6 +8,7 @@ number in [0, 1] where 1 = most similar.
 Build a bundle once per unit with make_bundle(text).
 """
 
+from collections import Counter
 
 class Bundle:
     """Precomputed tokens for one text unit, so we don't re-split repeatedly."""
@@ -41,6 +42,16 @@ def sim_dice(a, b):
         return 0.0
     inter = len(a.wset & b.wset)
     return 2 * inter / (len(a.wset) + len(b.wset))
+
+
+def sim_multi_dice(a, b):
+    """Sorensen-Dice on all words."""
+    if not a.words and not b.words:
+        return 1.0
+    if not a.words or not b.words:
+        return 0.0
+    inter = sum((Counter(a.words) & Counter(b.words)).values())
+    return 2 * inter / (len(a.words) + len(b.words))
 
 
 def sim_bigram_jaccard(a, b):
@@ -94,6 +105,7 @@ def make_combined(w_jaccard=0.5, w_lev=0.5):
 SIMILARITIES = {
     "jaccard": sim_jaccard,
     "dice": sim_dice,
+    "dice-all": sim_multi_dice,
     "bigram": sim_bigram_jaccard,
     "levenshtein": sim_word_levenshtein,
     "combined": make_combined(0.5, 0.5),

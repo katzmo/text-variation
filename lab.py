@@ -42,6 +42,7 @@ CONFIGS = {
     "sections10":    dict(window=10, similarity="jaccard",     strategy="lis"),
     # #5 order-aware similarity
     "dice":          dict(window=1,  similarity="dice",        strategy="lis"),
+    "dice-all":      dict(window=1,  similarity="dice-all",    strategy="lis"),
     "bigram":        dict(window=1,  similarity="bigram",      strategy="lis"),
     "levenshtein":   dict(window=1,  similarity="levenshtein", strategy="lis"),
     "combined":      dict(window=1,  similarity="combined",    strategy="lis"),
