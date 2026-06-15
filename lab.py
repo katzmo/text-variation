@@ -40,12 +40,14 @@ CONFIGS = {
     # #1 larger sections
     "sections5":     dict(window=5,  similarity="jaccard",     strategy="lis"),
     "sections10":    dict(window=10, similarity="jaccard",     strategy="lis"),
-    # #5 order-aware similarity
+    # #5 order-aware word similarity
     "dice":          dict(window=1,  similarity="dice",        strategy="lis"),
     "dice-all":      dict(window=1,  similarity="dice-all",    strategy="lis"),
     "bigram":        dict(window=1,  similarity="bigram",      strategy="lis"),
     "levenshtein":   dict(window=1,  similarity="levenshtein", strategy="lis"),
     "combined":      dict(window=1,  similarity="combined",    strategy="lis"),
+    # #6 order-aware character similarity
+    "dice-char":      dict(window=1,  similarity="dice-char",  strategy="lis"),
     # #4 positional preference
     "banded":        dict(window=1,  similarity="jaccard",     strategy="lis", band_frac=0.15),
     "positional":    dict(window=1,  similarity="jaccard",     strategy="lis", pos_weight=0.3),

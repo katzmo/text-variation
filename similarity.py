@@ -12,9 +12,10 @@ from collections import Counter
 
 class Bundle:
     """Precomputed tokens for one text unit, so we don't re-split repeatedly."""
-    __slots__ = ("words", "wset", "bigrams")
+    __slots__ = ("text", "words", "wset", "bigrams")
 
     def __init__(self, text):
+        self.text = text
         self.words = text.split()
         self.wset = set(self.words)
         self.bigrams = set(zip(self.words, self.words[1:]))
@@ -52,6 +53,16 @@ def sim_multi_dice(a, b):
         return 0.0
     inter = sum((Counter(a.words) & Counter(b.words)).values())
     return 2 * inter / (len(a.words) + len(b.words))
+
+
+def sim_char_dice(a, b):
+    """Sorensen-Dice on all characters."""
+    if not a.text and not b.text:
+        return 1.0
+    if not a.text or not b.text:
+        return 0.0
+    inter = sum((Counter(a.text) & Counter(b.text)).values())
+    return 2 * inter / (len(a.text) + len(b.text))
 
 
 def sim_bigram_jaccard(a, b):
@@ -106,6 +117,7 @@ SIMILARITIES = {
     "jaccard": sim_jaccard,
     "dice": sim_dice,
     "dice-all": sim_multi_dice,
+    "dice-char": sim_char_dice,
     "bigram": sim_bigram_jaccard,
     "levenshtein": sim_word_levenshtein,
     "combined": make_combined(0.5, 0.5),
