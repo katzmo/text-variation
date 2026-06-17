@@ -131,23 +131,6 @@
       <div class="col-detail" v-if="activeSeg !== null">
         <div class="col-detail-toggle" @click="detOpen = !detOpen">{{ detOpen ? '▼' : '▲' }}</div>
         <div class="col-detail-body" v-if="detOpen">
-          <div class="col-detail-texts">
-            <div class="col-detail-wit" v-for="(w, wi) in visibleCols" :key="w.id">
-              <div class="col-detail-badge" :class="badgeClass(wi, w.id)">{{ w.id }}</div>
-              <div class="col-detail-name">{{ w.name }}</div>
-              <div class="col-detail-segs">
-                <div
-                  v-for="(s, si) in segs"
-                  :key="si"
-                  class="col-detail-seg"
-                  :class="{ active: activeSeg === si }"
-                  @click="pickSeg(si)"
-                >
-                  {{ getSegText(w.id, si) }}
-                </div>
-              </div>
-            </div>
-          </div>
           <!-- Variant graph -->
           <div class="vg-strip">
             <div class="vg-strip-title">Variant graph</div>
@@ -1074,72 +1057,7 @@ defineExpose({ segs, colOrder, tree })
 }
 
 .col-detail-body {
-  max-height: 300px;
   overflow-y: auto;
-}
-
-.col-detail-texts {
-  display: flex;
-  overflow-x: auto;
-  padding: 6px 8px;
-  gap: 0;
-}
-
-.col-detail-wit {
-  min-width: 140px;
-  max-width: 180px;
-  flex-shrink: 0;
-  padding: 0 8px;
-  border-right: 1px solid var(--border);
-}
-
-.col-detail-wit:last-child {
-  border-right: none;
-}
-
-.col-detail-badge {
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: #e4e4e4;
-  border: 1px solid #bbb;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 7px;
-  font-weight: 700;
-  margin-bottom: 3px;
-}
-
-.col-detail-name {
-  font-size: 9px;
-  color: var(--ink3);
-  margin-bottom: 4px;
-}
-
-.col-detail-segs {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.col-detail-seg {
-  background: var(--bg);
-  border-radius: 2px;
-  padding: 3px 5px;
-  font-size: 9px;
-  line-height: 1.4;
-  color: var(--ink2);
-  cursor: pointer;
-}
-
-.col-detail-seg:hover {
-  background: var(--bg-hover);
-}
-
-.col-detail-seg.active {
-  background: var(--border);
-  border-left: 2px solid var(--ink);
 }
 
 .vg-strip {
