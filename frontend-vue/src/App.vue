@@ -24,32 +24,26 @@
     </main>
 
     <ExpandModal v-model="expandPanel">
-      <div
-        v-if="expandPanel === 'CHRONOLOGICAL DISTRIBUTION'"
-        style="height: 100%; padding: 8px 16px"
-      >
+      <div v-if="expandPanel === 'Timeline'" style="height: 100%; padding: 8px 16px">
         <TimelinePanel />
       </div>
-      <div v-if="expandPanel === 'GEOGRAPHICAL ORIGIN'" style="height: 100%; position: relative">
+      <div v-if="expandPanel === 'Origin'" style="height: 100%; position: relative">
         <OriginMap />
       </div>
-      <div v-if="expandPanel === 'AFFILIATION'" style="height: 100%; padding: 8px">
+      <div v-if="expandPanel === 'Affiliation'" style="height: 100%; padding: 8px">
         <BarChartPanel title="AFFILIATION" groupBy="affiliation" />
       </div>
-      <div v-if="expandPanel === 'SOURCE'" style="height: 100%; padding: 8px">
+      <div v-if="expandPanel === 'Source'" style="height: 100%; padding: 8px">
         <BarChartPanel title="SOURCE" groupBy="source" />
       </div>
-      <div v-if="expandPanel === 'TEXTUAL SIMILARITY NETWORK'" style="height: 100%; padding: 4px">
+      <div v-if="expandPanel === 'Textual similarity'" style="height: 100%; padding: 4px">
         <EmbeddingPanel />
       </div>
-      <div
-        v-if="expandPanel === 'VARIANT FREQUENCY DISTRIBUTION'"
-        style="height: 100%; padding: 6px 16px 4px"
-      >
+      <div v-if="expandPanel === 'Variant frequency'" style="height: 100%; padding: 6px 16px 4px">
         <FrequencyPanel />
       </div>
       <div
-        v-if="expandPanel === 'ACTIVE VARIANT LEXICON'"
+        v-if="expandPanel === 'Variant list'"
         style="height: 100%; overflow-y: auto; padding: 8px 0"
       >
         <VariantListPanel @pick="pickVariant" />
