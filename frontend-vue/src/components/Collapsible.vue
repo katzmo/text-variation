@@ -31,13 +31,13 @@ const toggle = () => {
 <style scoped>
 .collapsible-header {
   width: 100%;
-  padding: 1rem;
+  padding: var(--padding);
   background-color: var(--bg);
   border: none;
   cursor: pointer;
   display: flex;
   justify-content: flex-start;
-  column-gap: 1rem;
+  column-gap: var(--h-space);
   align-items: center;
   border-bottom: 1px solid var(--border);
 }
@@ -66,7 +66,7 @@ const toggle = () => {
 }
 
 .collapsible-content {
-  padding: 1rem;
+  padding: var(--padding);
   background: var(--bg);
 }
 

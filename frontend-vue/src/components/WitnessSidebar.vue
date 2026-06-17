@@ -85,8 +85,8 @@ const { witnesses, selectedWit, witSearch, filteredWitnesses } = useStore()
 .witness-item {
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 5px 12px;
+  gap: calc(var(--h-space) / 2);
+  padding: calc(var(--v-space) / 4) var(--h-space);
   cursor: pointer;
   transition: background 0.1s;
   user-select: none;

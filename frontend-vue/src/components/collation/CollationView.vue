@@ -750,7 +750,7 @@ defineExpose({ segs, colOrder, tree })
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 6px 12px;
+  padding: var(--padding);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
   background: var(--bg-panel);
@@ -784,8 +784,8 @@ defineExpose({ segs, colOrder, tree })
 
 .col-minimap {
   position: absolute;
-  top: 50px;
-  right: 15px;
+  top: calc(var(--v-space) * 4);
+  right: var(--h-space);
   width: 120px;
   background: var(--bg-panel);
   border: 1px solid var(--border2);
@@ -824,6 +824,7 @@ defineExpose({ segs, colOrder, tree })
   overflow: auto;
   position: relative;
   max-height: 80vh;
+  padding: var(--padding);
 }
 
 .col-dendro-wrap {

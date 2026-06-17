@@ -23,6 +23,9 @@
   --sans: 'Source Sans 3', system-ui, sans-serif;
   --panel-r: 6px;
   --shadow: 0 1px 4px rgba(0, 0, 0, 0.07), 0 0 0 1px var(--border);
+  --v-space: 1rem;
+  --h-space: 1rem;
+  --padding: var(--v-space) var(--h-space);
 }
 body {
   font-family: var(--sans);
@@ -87,10 +90,9 @@ select {
 .dashboard {
   flex: 1;
   overflow: auto;
-  padding: 10px;
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
-  gap: 8px;
+  gap: var(--padding);
   align-content: start;
 }
 .span-full {
@@ -128,7 +130,6 @@ select {
   background: var(--bg-hover);
 }
 .panel-body {
-  padding: 8px 10px;
   position: relative;
   min-height: 120px;
 }
