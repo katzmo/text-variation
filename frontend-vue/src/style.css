@@ -24,11 +24,6 @@
   --panel-r: 6px;
   --shadow: 0 1px 4px rgba(0, 0, 0, 0.07), 0 0 0 1px var(--border);
 }
-html,
-body {
-  height: 100%;
-  overflow: hidden;
-}
 body {
   font-family: var(--sans);
   background: var(--bg);
@@ -48,13 +43,13 @@ body {
   border-radius: 3px;
 }
 .shell {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  overflow: hidden;
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  grid-template-rows: auto 1fr;
 }
 .header {
-  flex-shrink: 0;
+  grid-column: 1/-1;
   height: 44px;
   display: flex;
   align-items: center;
@@ -69,15 +64,7 @@ body {
   font-weight: 700;
   letter-spacing: 0.01em;
 }
-.body {
-  flex: 1;
-  display: grid;
-  grid-template-columns: 220px 1fr;
-  overflow: hidden;
-}
 .main {
-  display: flex;
-  flex-direction: column;
   overflow: hidden;
   background: var(--bg);
 }
@@ -98,9 +85,6 @@ body {
 }
 .panel {
   background: transparent;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
   min-height: 0;
 }
 .panel-header {
@@ -135,9 +119,7 @@ body {
   background: var(--bg-hover);
 }
 .panel-body {
-  flex: 1;
   padding: 8px 10px;
-  overflow: hidden;
   position: relative;
   min-height: 120px;
 }

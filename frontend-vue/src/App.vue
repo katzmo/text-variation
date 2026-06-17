@@ -1,27 +1,25 @@
 <template>
   <div class="shell">
-    <div class="header">
+    <header class="header">
       <div class="header-title">Prototype D</div>
       <button class="upload-btn" @click="showUpload = true">↑ Upload texts</button>
-    </div>
+    </header>
 
     <UploadModal v-if="showUpload" @close="showUpload = false" />
 
-    <div class="body">
-      <WitnessSidebar />
-      <div class="main">
-        <div class="dashboard">
-          <TimelinePanel @expand="expandPanel = $event" />
-          <OriginMap @expand="expandPanel = $event" />
-          <BarChartPanel title="AFFILIATION" groupBy="affiliation" @expand="expandPanel = $event" />
-          <BarChartPanel title="SOURCE" groupBy="source" @expand="expandPanel = $event" />
-          <EmbeddingPanel @expand="expandPanel = $event" />
-          <FrequencyPanel @expand="expandPanel = $event" />
-          <VariantListPanel @expand="expandPanel = $event" @pick="pickVariant" />
-        </div>
-        <CollationView />
-      </div>
-    </div>
+    <WitnessSidebar />
+    <main class="main">
+      <section class="dashboard">
+        <TimelinePanel @expand="expandPanel = $event" />
+        <OriginMap @expand="expandPanel = $event" />
+        <BarChartPanel title="AFFILIATION" groupBy="affiliation" @expand="expandPanel = $event" />
+        <BarChartPanel title="SOURCE" groupBy="source" @expand="expandPanel = $event" />
+        <EmbeddingPanel @expand="expandPanel = $event" />
+        <FrequencyPanel @expand="expandPanel = $event" />
+        <VariantListPanel @expand="expandPanel = $event" @pick="pickVariant" />
+      </section>
+      <CollationView />
+    </main>
 
     <ExpandModal v-model="expandPanel">
       <div
@@ -97,6 +95,7 @@ function pickVariant(v) {
   cursor: pointer;
   transition: opacity 0.1s;
 }
+
 .upload-btn:hover {
   opacity: 0.85;
 }

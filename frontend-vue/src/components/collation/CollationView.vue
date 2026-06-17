@@ -1,7 +1,6 @@
 <template>
-  <div>
-    <div class="collation-resize" @mousedown="startResize"></div>
-    <div class="collation-panel" :style="{ height: panelH + 'px' }">
+  <section>
+    <div class="collation-panel">
       <!-- Header -->
       <div class="collation-header">
         <span class="collation-title">Collation view</span>
@@ -54,120 +53,112 @@
         <div class="col-minimap-vp" :style="minimapVP"></div>
       </div>
 
-      <div class="collation-body">
+      <div class="collation-body" ref="scrollEl" @scroll="onScroll">
         <!-- Dendro -->
         <div class="col-dendro-wrap">
           <svg ref="dendroSvg" style="display: block"></svg>
         </div>
 
         <!-- Columns scroll -->
-        <div class="col-scroll" ref="scrollEl" @scroll="onScroll">
-          <div class="col-inner">
-            <div class="col-row" ref="rowEl">
+        <div class="col-row" ref="rowEl">
+          <div
+            v-for="(w, wi) in visibleCols"
+            :key="w.id"
+            class="col-wit"
+            :class="{
+              dragging: dragId === w.id,
+              'col-drag-over': dragOver === w.id,
+              'col-zoomed': zoom > 90,
+              'col-selected': selectedWit === w.id,
+            }"
+            :style="{ width: cw + 'px' }"
+            draggable="true"
+            @dragstart="dragId = w.id"
+            @dragover.prevent="dragOver = w.id"
+            @drop="onDrop(w.id)"
+            @dragend="((dragId = null), (dragOver = null), drawDendro())"
+          >
+            <div class="col-badge-wrap">
               <div
-                v-for="(w, wi) in visibleCols"
-                :key="w.id"
-                class="col-wit"
-                :class="{
-                  dragging: dragId === w.id,
-                  'col-drag-over': dragOver === w.id,
-                  'col-zoomed': zoom > 90,
-                  'col-selected': selectedWit === w.id,
-                }"
-                :style="{ width: cw + 'px' }"
-                draggable="true"
-                @dragstart="dragId = w.id"
-                @dragover.prevent="dragOver = w.id"
-                @drop="onDrop(w.id)"
-                @dragend="((dragId = null), (dragOver = null), drawDendro())"
+                class="col-badge"
+                :class="[badgeClass(wi, w.id), { active: selectedWit === w.id }]"
+                @click="selectedWit = w.id"
+                :title="'Click to highlight ' + w.id"
               >
-                <div class="col-badge-wrap">
-                  <div
-                    class="col-badge"
-                    :class="[badgeClass(wi, w.id), { active: selectedWit === w.id }]"
-                    @click="selectedWit = w.id"
-                    :title="'Click to highlight ' + w.id"
-                  >
-                    {{ w.id }}
-                  </div>
-                  <div
-                    class="col-hide-btn"
-                    @click.stop="toggleHideCol(w.id)"
-                    title="Hide this column"
-                  >
-                    ×
-                  </div>
-                </div>
-                <div class="col-segs">
-                  <div
-                    v-for="(s, si) in segs"
-                    :key="si"
-                    class="col-seg"
-                    :class="{ active: activeSeg === si, highlighted: isHighlighted(w.id, si) }"
-                    :style="{
-                      height: sh + 'px',
-                      width: cw - 8 + 'px',
-                      background: segColor(w.id, si),
-                    }"
-                    @click="pickSeg(si)"
-                  >
-                    <div class="col-seg-text">{{ getSegText(w.id, si) }}</div>
-                  </div>
-                </div>
+                {{ w.id }}
               </div>
-              <svg
-                class="col-wave-svg"
-                :width="totalW"
-                :height="totalH"
-                style="position: absolute; top: 0; left: 0; pointer-events: none"
+              <div class="col-hide-btn" @click.stop="toggleHideCol(w.id)" title="Hide this column">
+                ×
+              </div>
+            </div>
+            <div class="col-segs">
+              <div
+                v-for="(s, si) in segs"
+                :key="si"
+                class="col-seg"
+                :class="{ active: activeSeg === si, highlighted: isHighlighted(w.id, si) }"
+                :style="{
+                  height: sh + 'px',
+                  width: cw - 8 + 'px',
+                  background: segColor(w.id, si),
+                }"
+                @click="pickSeg(si)"
               >
-                <path
-                  v-if="wavePath"
-                  :d="wavePath"
-                  fill="none"
-                  stroke="var(--ink)"
-                  stroke-width="1.8"
-                  stroke-linecap="round"
-                  opacity="0.7"
-                />
-              </svg>
+                <div class="col-seg-text">{{ getSegText(w.id, si) }}</div>
+              </div>
             </div>
           </div>
+          <svg
+            class="col-wave-svg"
+            :width="totalW"
+            :height="totalH"
+            style="position: absolute; top: 0; left: 0; pointer-events: none"
+          >
+            <path
+              v-if="wavePath"
+              :d="wavePath"
+              fill="none"
+              stroke="var(--ink)"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              opacity="0.7"
+            />
+          </svg>
         </div>
+      </div>
 
-        <!-- Detail strip -->
-        <div class="col-detail" v-if="activeSeg !== null">
-          <div class="col-detail-toggle" @click="detOpen = !detOpen">{{ detOpen ? '▼' : '▲' }}</div>
-          <div class="col-detail-body" v-if="detOpen">
-            <div class="col-detail-texts">
-              <div class="col-detail-wit" v-for="(w, wi) in visibleCols" :key="w.id">
-                <div class="col-detail-badge" :class="badgeClass(wi, w.id)">{{ w.id }}</div>
-                <div class="col-detail-name">{{ w.name }}</div>
-                <div class="col-detail-segs">
-                  <div
-                    v-for="(s, si) in segs"
-                    :key="si"
-                    class="col-detail-seg"
-                    :class="{ active: activeSeg === si }"
-                    @click="pickSeg(si)"
-                  >
-                    {{ getSegText(w.id, si) }}
-                  </div>
+      <!-- Detail strip -->
+      <div class="col-detail" v-if="activeSeg !== null">
+        <div class="col-detail-toggle" @click="detOpen = !detOpen">{{ detOpen ? '▼' : '▲' }}</div>
+        <div class="col-detail-body" v-if="detOpen">
+          <div class="col-detail-texts">
+            <div class="col-detail-wit" v-for="(w, wi) in visibleCols" :key="w.id">
+              <div class="col-detail-badge" :class="badgeClass(wi, w.id)">{{ w.id }}</div>
+              <div class="col-detail-name">{{ w.name }}</div>
+              <div class="col-detail-segs">
+                <div
+                  v-for="(s, si) in segs"
+                  :key="si"
+                  class="col-detail-seg"
+                  :class="{ active: activeSeg === si }"
+                  @click="pickSeg(si)"
+                >
+                  {{ getSegText(w.id, si) }}
                 </div>
               </div>
             </div>
-            <!-- Variant graph -->
-            <div class="vg-strip">
-              <div class="vg-strip-title">Variant graph</div>
-              <div class="vg-strip-scroll">
-                <svg ref="variantGraphSvg" style="display: block"></svg>
-              </div>
+          </div>
+          <!-- Variant graph -->
+          <div class="vg-strip">
+            <div class="vg-strip-title">Variant graph</div>
+            <div class="vg-strip-scroll">
+              <svg ref="variantGraphSvg" style="display: block"></svg>
             </div>
           </div>
         </div>
       </div>
     </div>
-  </div>
+  </section>
 </template>
 
 <script setup>
@@ -364,7 +355,7 @@ function drawDendro() {
   const maxH = tree.value.h && tree.value.h > 0 ? tree.value.h : 1
   function nodeY(node) {
     const frac = maxH > 0 ? node.h / maxH : 0.5
-    return H - 10 - frac * (H - 24)
+    return H - frac * (H - 4)
   }
   function draw(node) {
     if (!node.left && !node.right) return
@@ -376,8 +367,8 @@ function drawDendro() {
       return
     }
     const ny = nodeY(node)
-    const ly = node.left.left ? nodeY(node.left) : H - 10
-    const ry = node.right.left ? nodeY(node.right) : H - 10
+    const ly = node.left.left ? nodeY(node.left) : H
+    const ry = node.right.left ? nodeY(node.right) : H
     const g = svg.append('g')
 
     // Horizontal line between left and right children
@@ -762,26 +753,6 @@ defineExpose({ segs, colOrder, tree })
 </script>
 
 <style scoped>
-.collation-resize {
-  height: 6px;
-  background: var(--border);
-  cursor: ns-resize;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.1s;
-}
-.collation-resize:hover {
-  background: var(--border2);
-}
-.collation-resize::before {
-  content: '';
-  width: 32px;
-  height: 2px;
-  background: var(--ink3);
-  border-radius: 2px;
-}
 .collation-panel {
   flex-shrink: 0;
   background: var(--bg-panel);
@@ -791,6 +762,7 @@ defineExpose({ segs, colOrder, tree })
   position: relative;
   min-height: 180px;
 }
+
 .collation-header {
   display: flex;
   align-items: center;
@@ -800,16 +772,19 @@ defineExpose({ segs, colOrder, tree })
   flex-shrink: 0;
   background: var(--bg-panel);
 }
+
 .collation-title {
   font-family: var(--serif);
   font-size: 12px;
   font-weight: 700;
 }
+
 .collation-sub {
   font-family: var(--mono);
   font-size: 9px;
   color: var(--ink3);
 }
+
 .col-settings-btn {
   width: 26px;
   height: 26px;
@@ -824,35 +799,41 @@ defineExpose({ segs, colOrder, tree })
   justify-content: center;
   transition: background 0.1s;
 }
+
 .col-settings-btn:hover {
   background: var(--bg-hover);
   color: var(--ink);
 }
+
 .col-minimap {
   position: absolute;
-  top: 32px;
-  left: 8px;
+  top: 50px;
+  right: 15px;
   width: 120px;
   background: var(--bg-panel);
   border: 1px solid var(--border2);
   z-index: 50;
   cursor: crosshair;
 }
+
 .col-minimap-inner {
   display: flex;
   height: 70px;
   gap: 1px;
   padding: 2px;
 }
+
 .col-minimap-col {
   display: flex;
   flex-direction: column;
   gap: 1px;
   flex: 1;
 }
+
 .col-minimap-seg {
   flex: 1;
 }
+
 .col-minimap-vp {
   position: absolute;
   border: 2px solid var(--ink);
@@ -861,34 +842,24 @@ defineExpose({ segs, colOrder, tree })
   top: 0;
   left: 0;
 }
+
 .collation-body {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
+  overflow: auto;
   position: relative;
+  max-height: 80vh;
 }
+
 .col-dendro-wrap {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  background: var(--bg);
-  flex-shrink: 0;
   padding-top: 4px;
 }
-.col-scroll {
-  flex: 1;
-  overflow: auto;
-}
-.col-inner {
-  min-height: 100%;
-  padding: 0 4px 8px;
-}
+
 .col-row {
   display: flex;
   align-items: flex-start;
   position: relative;
+  padding: 4px 4px 8px;
 }
+
 .col-wit {
   display: flex;
   flex-direction: column;
@@ -898,10 +869,12 @@ defineExpose({ segs, colOrder, tree })
   position: relative;
   transition: opacity 0.12s;
 }
+
 .col-wit.dragging {
   opacity: 0.4;
   cursor: grabbing;
 }
+
 .col-wit.col-drag-over::before {
   content: '';
   position: absolute;
@@ -912,6 +885,7 @@ defineExpose({ segs, colOrder, tree })
   background: var(--ink);
   z-index: 10;
 }
+
 .col-badge {
   width: 34px;
   height: 34px;
@@ -925,15 +899,16 @@ defineExpose({ segs, colOrder, tree })
   font-weight: 700;
   color: #333;
   cursor: pointer;
-  flex-shrink: 0;
   transition: background 0.1s;
 }
+
 .col-badge-wrap {
   position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
 }
+
 .col-hide-btn {
   position: absolute;
   top: -3px;
@@ -954,21 +929,26 @@ defineExpose({ segs, colOrder, tree })
   opacity: 0;
   transition: opacity 0.1s;
 }
+
 .col-wit:hover .col-hide-btn {
   opacity: 1;
 }
+
 .col-hide-btn:hover {
   background: var(--ink);
   color: #fff;
   border-color: var(--ink);
 }
+
 .col-wit.col-selected {
   background: rgba(28, 26, 23, 0.05);
   border-radius: 6px;
 }
+
 .col-wit.col-selected .col-badge {
   box-shadow: 0 0 0 2px var(--ink);
 }
+
 .col-show-hidden {
   font-family: var(--mono);
   font-size: 10px;
@@ -979,37 +959,46 @@ defineExpose({ segs, colOrder, tree })
   padding: 3px 8px;
   cursor: pointer;
 }
+
 .col-show-hidden:hover {
   background: var(--bg-hover);
 }
+
 .col-badge.active {
   background: var(--ink);
   color: #fff;
   border-color: var(--ink);
 }
+
 .col-badge.cb0 {
   background: #e4e4e4;
 }
+
 .col-badge.cb1 {
   background: #f4c4b4;
   border-color: #e09880;
 }
+
 .col-badge.cb2 {
   background: #bce0b8;
   border-color: #88c480;
 }
+
 .col-badge.cb3 {
   background: #b4cce8;
   border-color: #80a8d4;
 }
+
 .col-badge.cb4 {
   background: #f0e4a4;
   border-color: #d4c464;
 }
+
 .col-badge.cb5 {
   background: #d4bce0;
   border-color: #b490cc;
 }
+
 .col-segs {
   display: flex;
   flex-direction: column;
@@ -1017,6 +1006,7 @@ defineExpose({ segs, colOrder, tree })
   padding: 2px 3px;
   width: 100%;
 }
+
 .col-seg {
   border-radius: 2px;
   cursor: pointer;
@@ -1024,17 +1014,21 @@ defineExpose({ segs, colOrder, tree })
   position: relative;
   transition: filter 0.08s;
 }
+
 .col-seg:hover {
   filter: brightness(1.1);
 }
+
 .col-seg.active {
   outline: 2px solid var(--ink);
   outline-offset: -1px;
 }
+
 .col-seg.highlighted {
   outline: 2px solid #c8860a !important;
   outline-offset: -1px;
 }
+
 .col-seg-text {
   font-size: 6px;
   line-height: 1.3;
@@ -1044,9 +1038,11 @@ defineExpose({ segs, colOrder, tree })
   display: none;
   width: 100%;
 }
+
 .col-zoomed .col-seg-text {
   display: block;
 }
+
 .col-wave-svg {
   position: absolute;
   top: 0;
@@ -1054,11 +1050,13 @@ defineExpose({ segs, colOrder, tree })
   pointer-events: none;
   z-index: 20;
 }
+
 .col-detail {
   flex-shrink: 0;
   background: var(--bg-panel);
   border-top: 1px solid var(--border);
 }
+
 .col-detail-toggle {
   display: flex;
   align-items: center;
@@ -1070,19 +1068,23 @@ defineExpose({ segs, colOrder, tree })
   background: var(--bg);
   border-bottom: 1px solid var(--border);
 }
+
 .col-detail-toggle:hover {
   background: var(--bg-hover);
 }
+
 .col-detail-body {
   max-height: 300px;
   overflow-y: auto;
 }
+
 .col-detail-texts {
   display: flex;
   overflow-x: auto;
   padding: 6px 8px;
   gap: 0;
 }
+
 .col-detail-wit {
   min-width: 140px;
   max-width: 180px;
@@ -1090,9 +1092,11 @@ defineExpose({ segs, colOrder, tree })
   padding: 0 8px;
   border-right: 1px solid var(--border);
 }
+
 .col-detail-wit:last-child {
   border-right: none;
 }
+
 .col-detail-badge {
   width: 26px;
   height: 26px;
@@ -1106,16 +1110,19 @@ defineExpose({ segs, colOrder, tree })
   font-weight: 700;
   margin-bottom: 3px;
 }
+
 .col-detail-name {
   font-size: 9px;
   color: var(--ink3);
   margin-bottom: 4px;
 }
+
 .col-detail-segs {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
+
 .col-detail-seg {
   background: var(--bg);
   border-radius: 2px;
@@ -1125,18 +1132,22 @@ defineExpose({ segs, colOrder, tree })
   color: var(--ink2);
   cursor: pointer;
 }
+
 .col-detail-seg:hover {
   background: var(--bg-hover);
 }
+
 .col-detail-seg.active {
   background: var(--border);
   border-left: 2px solid var(--ink);
 }
+
 .vg-strip {
   border-top: 1px solid var(--border);
   padding: 8px 12px;
   background: var(--bg);
 }
+
 .vg-strip-title {
   font-family: var(--serif);
   font-size: 11px;
@@ -1144,6 +1155,7 @@ defineExpose({ segs, colOrder, tree })
   margin-bottom: 6px;
   color: var(--ink);
 }
+
 .vg-strip-scroll {
   overflow-x: auto;
   padding-bottom: 4px;
