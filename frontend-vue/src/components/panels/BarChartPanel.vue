@@ -1,7 +1,7 @@
 <template>
   <div class="panel" style="min-height: 180px; max-height: 220px">
     <div class="panel-header">
-      <span class="panel-title">{{ title }}</span>
+      <h3 class="panel-title">{{ title }}</h3>
       <div class="panel-expand" @click="$emit('expand', title)">⤢</div>
     </div>
     <div class="panel-body" ref="containerEl">

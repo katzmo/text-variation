@@ -18,7 +18,7 @@ const toggle = () => {
 <template>
   <section :class="{ collapsible: true, open: isOpen }">
     <button @click="toggle" class="collapsible-header">
-      <span>{{ title }}</span>
+      <h2>{{ title }}</h2>
     </button>
     <Transition name="slide">
       <div v-if="isOpen" class="collapsible-content">
@@ -39,7 +39,6 @@ const toggle = () => {
   justify-content: flex-start;
   column-gap: 1rem;
   align-items: center;
-  font-size: 16px;
   border-bottom: 1px solid var(--border);
 }
 

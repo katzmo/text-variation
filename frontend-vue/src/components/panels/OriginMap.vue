@@ -1,7 +1,7 @@
 <template>
   <div class="panel" style="min-height: 180px; max-height: 220px">
     <div class="panel-header">
-      <span class="panel-title">GEOGRAPHICAL ORIGIN</span>
+      <h3 class="panel-title">{{ title }}</h3>
       <div class="panel-expand" @click="$emit('expand', 'Origin')">⤢</div>
     </div>
     <div
@@ -21,6 +21,7 @@ import * as d3 from 'd3'
 import * as topojson from 'topojson-client'
 import { useStore } from '../../composables/useStore.js'
 
+const props = defineProps({ title: String })
 defineEmits(['expand'])
 const { witnesses, selectedWit } = useStore()
 const containerEl = ref(null)

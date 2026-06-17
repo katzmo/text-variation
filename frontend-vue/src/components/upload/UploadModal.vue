@@ -2,7 +2,7 @@
   <div class="upload-overlay" @click.self="$emit('close')">
     <div class="upload-modal">
       <div class="upload-modal-header">
-        <span class="upload-modal-title">Upload witness texts</span>
+        <h2 class="upload-modal-title">Upload witness texts</h2>
         <button class="upload-modal-close" @click="$emit('close')">✕</button>
       </div>
 
@@ -225,6 +225,7 @@ function goToAlign() {
   justify-content: center;
   padding: 32px;
 }
+
 .upload-modal {
   background: var(--bg-panel);
   border-radius: 10px;
@@ -236,6 +237,7 @@ function goToAlign() {
   flex-direction: column;
   overflow: hidden;
 }
+
 .upload-modal-header {
   display: flex;
   align-items: center;
@@ -243,12 +245,11 @@ function goToAlign() {
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
+
 .upload-modal-title {
-  font-family: var(--serif);
-  font-size: 15px;
-  font-weight: 700;
   flex: 1;
 }
+
 .upload-modal-close {
   width: 28px;
   height: 28px;
@@ -262,14 +263,17 @@ function goToAlign() {
   font-size: 14px;
   color: var(--ink3);
 }
+
 .upload-modal-close:hover {
   background: var(--bg-hover);
 }
+
 .upload-steps {
   display: flex;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
+
 .upload-step {
   flex: 1;
   padding: 10px 16px;
@@ -280,11 +284,13 @@ function goToAlign() {
   align-items: center;
   gap: 7px;
 }
+
 .upload-step.active {
   color: var(--ink);
   border-bottom-color: var(--ink);
   font-weight: 500;
 }
+
 .step-num {
   width: 20px;
   height: 20px;
@@ -298,19 +304,23 @@ function goToAlign() {
   justify-content: center;
   flex-shrink: 0;
 }
+
 .upload-step.active .step-num {
   background: var(--ink);
   color: #fff;
 }
+
 .upload-step.done .step-num {
   background: #4a9;
   color: #fff;
 }
+
 .upload-body {
   flex: 1;
   overflow-y: auto;
   padding: 20px;
 }
+
 .upload-footer {
   display: flex;
   align-items: center;
@@ -320,6 +330,7 @@ function goToAlign() {
   border-top: 1px solid var(--border);
   flex-shrink: 0;
 }
+
 .processing {
   display: flex;
   flex-direction: column;
@@ -327,6 +338,7 @@ function goToAlign() {
   gap: 16px;
   padding: 40px;
 }
+
 .processing-text {
   font-family: var(--mono);
   font-size: 12px;

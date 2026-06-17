@@ -3,7 +3,7 @@
     <div class="collation-panel">
       <!-- Header -->
       <div class="collation-header">
-        <span class="collation-title">Collation view</span>
+        <h2 class="collation-title">Collation view</h2>
         <span class="collation-sub">
           drag columns · click badge to highlight · × to hide · zoom
         </span>
@@ -133,7 +133,7 @@
         <div class="col-detail-body" v-if="detOpen">
           <!-- Variant graph -->
           <div class="vg-strip">
-            <div class="vg-strip-title">Variant graph</div>
+            <h3 class="vg-strip-title">Variant graph</h3>
             <div class="vg-strip-scroll">
               <svg ref="variantGraphSvg" style="display: block"></svg>
             </div>
@@ -756,15 +756,9 @@ defineExpose({ segs, colOrder, tree })
   background: var(--bg-panel);
 }
 
-.collation-title {
-  font-family: var(--serif);
-  font-size: 12px;
-  font-weight: 700;
-}
-
 .collation-sub {
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: 0.8em;
   color: var(--ink3);
 }
 
@@ -775,7 +769,7 @@ defineExpose({ segs, colOrder, tree })
   border-radius: 4px;
   background: var(--bg);
   cursor: pointer;
-  font-size: 13px;
+  font-size: 1.4em;
   color: var(--ink2);
   display: flex;
   align-items: center;
@@ -878,7 +872,7 @@ defineExpose({ segs, colOrder, tree })
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 8px;
+  font-size: 0.8em;
   font-weight: 700;
   color: #333;
   cursor: pointer;
@@ -903,7 +897,6 @@ defineExpose({ segs, colOrder, tree })
   background: var(--bg-panel);
   border: 1px solid var(--border2);
   color: var(--ink3);
-  font-size: 10px;
   line-height: 1;
   display: flex;
   align-items: center;
@@ -934,7 +927,7 @@ defineExpose({ segs, colOrder, tree })
 
 .col-show-hidden {
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: 0.8em;
   color: var(--ink2);
   background: var(--bg);
   border: 1px solid var(--border2);
@@ -1013,7 +1006,7 @@ defineExpose({ segs, colOrder, tree })
 }
 
 .col-seg-text {
-  font-size: 6px;
+  font-size: 0.6em;
   line-height: 1.3;
   color: #111;
   padding: 2px 3px;
@@ -1047,7 +1040,7 @@ defineExpose({ segs, colOrder, tree })
   height: 20px;
   cursor: pointer;
   color: var(--ink3);
-  font-size: 10px;
+  font-size: 0.8em;
   background: var(--bg);
   border-bottom: 1px solid var(--border);
 }
@@ -1067,9 +1060,6 @@ defineExpose({ segs, colOrder, tree })
 }
 
 .vg-strip-title {
-  font-family: var(--serif);
-  font-size: 11px;
-  font-weight: 700;
   margin-bottom: 6px;
   color: var(--ink);
 }

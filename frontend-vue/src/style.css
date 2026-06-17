@@ -28,7 +28,7 @@ body {
   font-family: var(--sans);
   background: var(--bg);
   color: var(--ink);
-  font-size: 13px;
+  font-size: 0.8rem;
   line-height: 1.4;
 }
 ::-webkit-scrollbar {
@@ -41,6 +41,28 @@ body {
 ::-webkit-scrollbar-thumb {
   background: var(--border2);
   border-radius: 3px;
+}
+h1,
+h2,
+h3 {
+  font-family: var(--serif);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+h1 {
+  font-size: 1.6em;
+}
+h2 {
+  font-size: 1.4em;
+}
+h3 {
+  font-size: 1em;
+}
+button,
+input,
+select {
+  font-family: var(--sans);
+  font-size: 1em;
 }
 .shell {
   min-height: 100vh;
@@ -57,12 +79,6 @@ body {
   background: var(--bg-panel);
   border-bottom: 1px solid var(--border);
   position: relative;
-}
-.header-title {
-  font-family: var(--serif);
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: 0.01em;
 }
 .main {
   overflow: hidden;
@@ -94,12 +110,6 @@ body {
   padding: 4px 0 4px;
   flex-shrink: 0;
 }
-.panel-title {
-  font-family: var(--serif);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-}
 .panel-expand {
   width: 16px;
   height: 16px;
@@ -109,7 +119,6 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 9px;
   color: var(--ink3);
   background: var(--bg);
   transition: background 0.1s;
@@ -129,8 +138,6 @@ body {
   color: #fff;
   border: none;
   border-radius: 5px;
-  font-family: var(--sans);
-  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   transition: opacity 0.1s;
@@ -148,8 +155,6 @@ body {
   color: var(--ink2);
   border: 1px solid var(--border2);
   border-radius: 5px;
-  font-family: var(--sans);
-  font-size: 13px;
   cursor: pointer;
 }
 .btn-secondary:hover {
@@ -160,7 +165,7 @@ body {
   background: var(--ink);
   color: #fff;
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: 0.8em;
   padding: 4px 7px;
   border-radius: 3px;
   pointer-events: none;

@@ -1,7 +1,7 @@
 <template>
   <div class="panel variant-list-panel">
     <div class="panel-header">
-      <span class="panel-title">ACTIVE VARIANT LEXICON</span>
+      <h3 class="panel-title">{{ title }}</h3>
       <div style="display: flex; align-items: center; gap: 4px">
         <button class="vl-sort-btn" @click="sortVariants">↑↓</button>
         <div class="panel-expand" @click="$emit('expand', 'Variant list')">⤢</div>
@@ -27,6 +27,8 @@
 
 <script setup>
 import { useStore } from '../../composables/useStore.js'
+
+const props = defineProps({ title: String })
 defineEmits(['expand', 'pick'])
 const { variants, selectedVariant } = useStore()
 function sortVariants() {
@@ -42,6 +44,7 @@ function sortVariants() {
   flex-direction: column;
   max-height: 720px;
 }
+
 .variant-list-controls {
   display: flex;
   align-items: center;
@@ -50,26 +53,30 @@ function sortVariants() {
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
+
 .vl-sort-btn {
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: 0.8em;
   color: var(--ink3);
   background: none;
   border: none;
   cursor: pointer;
   padding: 0 2px;
 }
+
 .vl-count {
   margin-left: auto;
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: 0.8em;
   color: var(--ink3);
 }
+
 .variant-list {
   flex: 1;
   overflow-y: auto;
   padding: 4px 0;
 }
+
 .variant-item {
   display: flex;
   align-items: center;
@@ -77,26 +84,26 @@ function sortVariants() {
   padding: 3px 10px;
   cursor: pointer;
   transition: background 0.08s;
-  font-size: 12px;
 }
+
 .variant-item:hover {
   background: var(--bg-hover);
 }
+
 .variant-item.selected {
   background: var(--sel-bg);
   color: var(--sel-fg);
 }
+
 .vi-num {
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: 0.8em;
   color: var(--ink3);
   min-width: 22px;
   text-align: right;
 }
+
 .variant-item.selected .vi-num {
   color: rgba(255, 255, 255, 0.5);
-}
-.vi-word {
-  font-size: 12px;
 }
 </style>

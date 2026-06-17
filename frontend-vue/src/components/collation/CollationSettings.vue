@@ -2,7 +2,7 @@
   <div class="col-settings-overlay" @click.self="$emit('close')">
     <div class="col-settings-panel">
       <div class="col-settings-header">
-        <span class="col-settings-title">Settings</span>
+        <h3 class="col-settings-title">Settings</h3>
         <button class="col-settings-close" @click="$emit('close')">✕</button>
       </div>
 
@@ -81,6 +81,7 @@ const varTypes = [
   justify-content: flex-end;
   padding: 80px 12px 0;
 }
+
 .col-settings-panel {
   background: #fff;
   border-radius: 10px;
@@ -89,70 +90,72 @@ const varTypes = [
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.18);
   border: 1px solid var(--border);
 }
+
 .col-settings-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 16px;
 }
-.col-settings-title {
-  font-family: var(--serif);
-  font-size: 14px;
-  font-weight: 700;
-}
+
 .col-settings-close {
   border: none;
   background: none;
   cursor: pointer;
-  font-size: 16px;
+  font-size: 1.4em;
   color: var(--ink3);
   padding: 0;
 }
+
 .col-settings-close:hover {
   color: var(--ink);
 }
+
 .col-settings-group {
   margin-bottom: 14px;
 }
+
 .col-settings-group:last-child {
   margin-bottom: 0;
 }
+
 .col-settings-label {
-  font-size: 12px;
   color: var(--ink2);
   margin-bottom: 6px;
   font-weight: 500;
 }
+
 .col-settings-select {
   width: 100%;
   padding: 6px 9px;
   border: 1px solid var(--border2);
   border-radius: 6px;
-  font-size: 12px;
   background: var(--bg);
   color: var(--ink);
   cursor: pointer;
-  font-family: var(--sans);
 }
+
 .col-settings-radio,
 .col-settings-check {
   display: flex;
   flex-direction: column;
   gap: 7px;
 }
+
 .col-settings-radio label,
 .col-settings-check label {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
   cursor: pointer;
   color: var(--ink);
 }
+
 .col-settings-radio label.disabled {
   color: var(--ink3);
   cursor: default;
 }
+
 .col-settings-radio input,
 .col-settings-check input {
   accent-color: var(--ink);

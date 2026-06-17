@@ -1,7 +1,7 @@
 <template>
   <div class="panel span-2" style="min-height: 200px; max-height: 240px">
     <div class="panel-header">
-      <span class="panel-title">TEXTUAL SIMILARITY NETWORK</span>
+      <h3 class="panel-title">{{ title }}</h3>
       <div
         class="panel-expand"
         style="margin-left: 4px"
@@ -25,6 +25,7 @@ import { ref, onMounted, onUnmounted, watch } from 'vue'
 import * as d3 from 'd3'
 import { useStore } from '../../composables/useStore.js'
 
+const props = defineProps({ title: String })
 defineEmits(['expand'])
 const { witnesses, selectedWit } = useStore()
 const containerEl = ref(null)

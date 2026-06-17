@@ -1,7 +1,7 @@
 <template>
   <div class="shell">
     <header class="header">
-      <div class="header-title">Prototype D</div>
+      <h1 class="header-title">Prototype D</h1>
       <button class="upload-btn" @click="showUpload = true">↑ Upload texts</button>
     </header>
 
@@ -11,13 +11,17 @@
     <main class="main">
       <Collapsible title="Dashboard">
         <div class="dashboard">
-          <TimelinePanel @expand="expandPanel = $event" />
-          <OriginMap @expand="expandPanel = $event" />
-          <BarChartPanel title="AFFILIATION" groupBy="affiliation" @expand="expandPanel = $event" />
-          <BarChartPanel title="SOURCE" groupBy="source" @expand="expandPanel = $event" />
-          <EmbeddingPanel @expand="expandPanel = $event" />
-          <FrequencyPanel @expand="expandPanel = $event" />
-          <VariantListPanel @expand="expandPanel = $event" @pick="pickVariant" />
+          <TimelinePanel title="Chronological Distribution" @expand="expandPanel = $event" />
+          <OriginMap title="Geographical Origin" @expand="expandPanel = $event" />
+          <BarChartPanel title="Affiliation" groupBy="affiliation" @expand="expandPanel = $event" />
+          <BarChartPanel title="Source" groupBy="source" @expand="expandPanel = $event" />
+          <EmbeddingPanel title="Textual Similarity Network" @expand="expandPanel = $event" />
+          <FrequencyPanel title="Variant Frequency Distribution" @expand="expandPanel = $event" />
+          <VariantListPanel
+            title="Active Variant Lexicon"
+            @expand="expandPanel = $event"
+            @pick="pickVariant"
+          />
         </div>
       </Collapsible>
       <CollationView />
@@ -86,8 +90,6 @@ function pickVariant(v) {
   color: #fff;
   border: none;
   border-radius: 4px;
-  font-family: var(--sans);
-  font-size: 12px;
   font-weight: 500;
   cursor: pointer;
   transition: opacity 0.1s;

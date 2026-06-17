@@ -2,7 +2,7 @@
   <div class="expand-overlay" v-if="modelValue" @click.self="$emit('update:modelValue', null)">
     <div class="expand-modal">
       <div class="expand-modal-header">
-        <span class="expand-modal-title">{{ modelValue }}</span>
+        <h2 class="expand-modal-title">{{ modelValue }}</h2>
         <button class="expand-modal-close" @click="$emit('update:modelValue', null)">✕</button>
       </div>
       <div class="expand-modal-body" ref="bodyEl">
@@ -30,6 +30,7 @@ const bodyEl = ref(null)
   justify-content: center;
   padding: 24px;
 }
+
 .expand-modal {
   background: var(--bg-panel);
   border-radius: 8px;
@@ -40,6 +41,7 @@ const bodyEl = ref(null)
   flex-direction: column;
   overflow: hidden;
 }
+
 .expand-modal-header {
   display: flex;
   align-items: center;
@@ -47,12 +49,11 @@ const bodyEl = ref(null)
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
+
 .expand-modal-title {
-  font-family: var(--serif);
-  font-size: 14px;
-  font-weight: 700;
   flex: 1;
 }
+
 .expand-modal-close {
   width: 28px;
   height: 28px;
@@ -63,13 +64,15 @@ const bodyEl = ref(null)
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  font-size: 1.4em;
   color: var(--ink3);
 }
+
 .expand-modal-close:hover {
   background: var(--bg-hover);
   color: var(--ink);
 }
+
 .expand-modal-body {
   flex: 1;
   overflow: auto;

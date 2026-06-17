@@ -1,7 +1,7 @@
 <template>
   <aside class="sidebar">
     <div class="sidebar-header">
-      <span class="sidebar-title">Witnesses</span>
+      <h3 class="sidebar-title">Witnesses</h3>
       <span class="sidebar-count">{{ witnesses.length }}</span>
     </div>
     <div class="sidebar-search">
@@ -36,6 +36,7 @@ const { witnesses, selectedWit, witSearch, filteredWitnesses } = useStore()
   flex-direction: column;
   overflow: hidden;
 }
+
 .sidebar-header {
   display: flex;
   align-items: center;
@@ -44,44 +45,43 @@ const { witnesses, selectedWit, witSearch, filteredWitnesses } = useStore()
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
-.sidebar-title {
-  font-family: var(--serif);
-  font-size: 13px;
-  font-weight: 700;
-}
+
 .sidebar-count {
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 0.8em;
   color: var(--ink3);
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 3px;
   padding: 1px 6px;
 }
+
 .sidebar-search {
   padding: 7px 10px;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
+
 .sidebar-search input {
   width: 100%;
   padding: 5px 8px;
   border: 1px solid var(--border2);
   border-radius: 4px;
-  font-family: var(--sans);
-  font-size: 12px;
   background: var(--bg);
   color: var(--ink);
   outline: none;
 }
+
 .sidebar-search input:focus {
   border-color: var(--ink3);
 }
+
 .witness-list {
   flex: 1;
   overflow-y: auto;
   padding: 4px 0;
 }
+
 .witness-item {
   display: flex;
   align-items: center;
@@ -91,13 +91,16 @@ const { witnesses, selectedWit, witSearch, filteredWitnesses } = useStore()
   transition: background 0.1s;
   user-select: none;
 }
+
 .witness-item:hover {
   background: var(--bg-hover);
 }
+
 .witness-item.selected {
   background: var(--sel-bg);
   color: var(--sel-fg);
 }
+
 .wit-bullet {
   width: 5px;
   height: 5px;
@@ -106,24 +109,27 @@ const { witnesses, selectedWit, witSearch, filteredWitnesses } = useStore()
   flex-shrink: 0;
   margin-top: 1px;
 }
+
 .witness-item.selected .wit-bullet {
   background: rgba(255, 255, 255, 0.5);
 }
+
 .wit-id {
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: 0.8em;
   color: var(--ink3);
   flex-shrink: 0;
   min-width: 32px;
 }
+
 .wit-name {
-  font-size: 12px;
   color: var(--ink);
-  line-height: 1.3;
 }
+
 .witness-item.selected .wit-id {
   color: rgba(255, 255, 255, 0.6);
 }
+
 .witness-item.selected .wit-name {
   color: #fff;
 }

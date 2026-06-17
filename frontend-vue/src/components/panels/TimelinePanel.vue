@@ -1,7 +1,7 @@
 <template>
   <div class="panel span-full" style="min-height: 100px; max-height: 110px">
     <div class="panel-header">
-      <span class="panel-title">CHRONOLOGICAL DISTRIBUTION</span>
+      <h3 class="panel-title">{{ title }}</h3>
       <div class="panel-expand" @click="$emit('expand', 'Timeline')">⤢</div>
     </div>
     <div
@@ -20,6 +20,7 @@ import { ref, onMounted, onUnmounted, watch } from 'vue'
 import * as d3 from 'd3'
 import { useStore } from '../../composables/useStore.js'
 
+const props = defineProps({ title: String })
 defineEmits(['expand'])
 const { witnesses, selectedWit } = useStore()
 
@@ -142,6 +143,7 @@ defineExpose({ draw })
   transition: opacity 0.1s;
   transform: translateX(-50%);
 }
+
 .tl-tooltip.show {
   opacity: 1;
 }
