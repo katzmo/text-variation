@@ -9,15 +9,17 @@
 
     <WitnessSidebar />
     <main class="main">
-      <section class="dashboard">
-        <TimelinePanel @expand="expandPanel = $event" />
-        <OriginMap @expand="expandPanel = $event" />
-        <BarChartPanel title="AFFILIATION" groupBy="affiliation" @expand="expandPanel = $event" />
-        <BarChartPanel title="SOURCE" groupBy="source" @expand="expandPanel = $event" />
-        <EmbeddingPanel @expand="expandPanel = $event" />
-        <FrequencyPanel @expand="expandPanel = $event" />
-        <VariantListPanel @expand="expandPanel = $event" @pick="pickVariant" />
-      </section>
+      <Collapsible title="Dashboard">
+        <div class="dashboard">
+          <TimelinePanel @expand="expandPanel = $event" />
+          <OriginMap @expand="expandPanel = $event" />
+          <BarChartPanel title="AFFILIATION" groupBy="affiliation" @expand="expandPanel = $event" />
+          <BarChartPanel title="SOURCE" groupBy="source" @expand="expandPanel = $event" />
+          <EmbeddingPanel @expand="expandPanel = $event" />
+          <FrequencyPanel @expand="expandPanel = $event" />
+          <VariantListPanel @expand="expandPanel = $event" @pick="pickVariant" />
+        </div>
+      </Collapsible>
       <CollationView />
     </main>
 
@@ -59,6 +61,7 @@
 <script setup>
 import { ref } from 'vue'
 import WitnessSidebar from './components/WitnessSidebar.vue'
+import Collapsible from './components/Collapsible.vue'
 import UploadModal from './components/upload/UploadModal.vue'
 import ExpandModal from './components/ExpandModal.vue'
 import TimelinePanel from './components/panels/TimelinePanel.vue'
