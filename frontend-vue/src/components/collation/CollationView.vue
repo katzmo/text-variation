@@ -160,7 +160,13 @@
             <div class="vg-strip">
               <div class="vg-strip-title">Variant graph</div>
               <div class="vg-strip-scroll">
-                <svg ref="variantGraphSvg" style="display: block"></svg>
+                <GraphView
+                  :data="graphData"
+                  :translation-order="graphTranslationOrder"
+                  :hovered-translation="graphHovered"
+                  :zoom="1"
+                  @hover="graphHovered = $event"
+                />
               </div>
             </div>
           </div>
@@ -174,6 +180,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import * as d3 from 'd3'
 import CollationSettings from './CollationSettings.vue'
+import GraphView from './GraphView.vue'
 import { useStore } from '../../composables/useStore.js'
 import { jaccard, upgma, leafOrder, normalizeText, badgeClass as _badgeClass } from '../../utils.js'
 import { postCollate } from '../../api.js'
@@ -219,7 +226,11 @@ const dendroSvg = ref(null)
 const scrollEl = ref(null)
 const rowEl = ref(null)
 const minimapEl = ref(null)
-const variantGraphSvg = ref(null)
+
+// ── Graph view state ──────────────────────────────────────────────────────────
+const graphData = ref([])
+const graphHovered = ref(null)
+const graphTranslationOrder = computed(() => colOrder.value.map((w) => w.id))
 
 // ── Computed ─────────────────────────────────────────────────────────────────
 const cw = computed(() => Math.max(30, Math.round(zoom.value * 0.68)))
@@ -432,6 +443,20 @@ function drawWave() {
 }
 
 // ── Variant graph ─────────────────────────────────────────────────────────────
+function toGraphData(data) {
+  if (!data?.table) return []
+  return data.table.map((row) => {
+    const groups = {}
+    data.witnesses.forEach((wit) => {
+      const text = row[wit]?.[0]?.t || '-'
+      const key = text.toLowerCase() || '__gap__'
+      if (!groups[key]) groups[key] = { representative: text || '-', translations: [] }
+      groups[key].translations.push(wit)
+    })
+    return { groups: Object.values(groups) }
+  })
+}
+
 async function pickSeg(si) {
   activeSeg.value = si
   drawWave()
@@ -451,7 +476,7 @@ async function pickSeg(si) {
     }
   }
   if (!data) data = mockCollate(si)
-  if (variantGraphSvg.value) drawVariantGraph(variantGraphSvg.value, data)
+  graphData.value = toGraphData(data)
 }
 
 function mockCollate(si) {
@@ -471,115 +496,6 @@ function mockCollate(si) {
     table.push(row)
   }
   return { table, witnesses: tokens.map((t) => t.id) }
-}
-
-function drawVariantGraph(svgEl, data) {
-  if (!svgEl || !data?.table) return
-  const table = data.table
-  const wits = data.witnesses
-  const nodes = []
-  const links = []
-  const prevNode = {}
-  table.forEach((row, colIdx) => {
-    const groups = {}
-    wits.forEach((wit) => {
-      const tok = row[wit]
-      const text = tok?.[0]?.t || ''
-      const key = text.toLowerCase() || '__gap__'
-      if (!groups[key])
-        groups[key] = {
-          id: `c${colIdx}_${key}`,
-          text: text || '—',
-          isGap: !text,
-          colIdx,
-          witnesses: [],
-        }
-      groups[key].witnesses.push(wit)
-    })
-    Object.values(groups).forEach((node, i) => {
-      node.yOffset = (i - (Object.values(groups).length - 1) / 2) * 32
-      nodes.push(node)
-    })
-    wits.forEach((wit) => {
-      const text = row[wit]?.[0]?.t || ''
-      const key = text.toLowerCase() || '__gap__'
-      const curId = `c${colIdx}_${key}`
-      if (colIdx > 0 && prevNode[wit]) {
-        let link = links.find((l) => l.source === prevNode[wit] && l.target === curId)
-        if (!link) {
-          link = { source: prevNode[wit], target: curId, weight: 0, witnesses: [] }
-          links.push(link)
-        }
-        link.weight++
-        link.witnesses.push(wit)
-      }
-      prevNode[wit] = curId
-    })
-  })
-
-  const colSpacing = 90
-  const nodeW = 64
-  const W = Math.max(600, table.length * colSpacing + 80)
-  const H = 180
-  nodes.forEach((n) => {
-    n.x = n.colIdx * colSpacing
-    n.y = n.yOffset
-  })
-  const linkData = links
-    .map((l) => ({
-      ...l,
-      sn: nodes.find((n) => n.id === l.source),
-      tn: nodes.find((n) => n.id === l.target),
-    }))
-    .filter((l) => l.sn && l.tn)
-  const selVar = (selectedVariant.value || '').toLowerCase()
-
-  const svg = d3.select(svgEl).attr('width', W).attr('height', H)
-  svg.selectAll('*').remove()
-  const g = svg.append('g').attr('transform', `translate(40,${H / 2})`)
-  g.selectAll('.vg-link')
-    .data(linkData)
-    .join('path')
-    .attr('class', 'vg-link')
-    .attr(
-      'd',
-      (d) =>
-        `M${d.sn.x} ${d.sn.y} C${d.sn.x + colSpacing / 2.5} ${d.sn.y},${d.tn.x - colSpacing / 2.5} ${d.tn.y},${d.tn.x} ${d.tn.y}`,
-    )
-    .attr('fill', 'none')
-    .attr('stroke', '#bbb4a4')
-    .attr('stroke-width', (d) => Math.max(1, Math.min(8, d.weight * 1.4)))
-    .attr('opacity', 0.55)
-    .append('title')
-    .text((d) => `${d.witnesses.join(', ')} (${d.weight})`)
-  const ng = g
-    .selectAll('.vg-node')
-    .data(nodes)
-    .join('g')
-    .attr('class', 'vg-node')
-    .attr('transform', (d) => `translate(${d.x},${d.y})`)
-  ng.append('rect')
-    .attr('x', -nodeW / 2)
-    .attr('y', -11)
-    .attr('width', nodeW)
-    .attr('height', 22)
-    .attr('rx', 11)
-    .attr('fill', (d) =>
-      selVar && d.text.toLowerCase().includes(selVar) ? '#f0d090' : d.isGap ? '#f0ede6' : '#fff',
-    )
-    .attr('stroke', (d) =>
-      selVar && d.text.toLowerCase().includes(selVar) ? '#c8860a' : '#ccc4b4',
-    )
-    .attr('stroke-width', (d) => (selVar && d.text.toLowerCase().includes(selVar) ? 2 : 1))
-  ng.append('text')
-    .attr('text-anchor', 'middle')
-    .attr('dominant-baseline', 'middle')
-    .attr('font-family', 'var(--mono)')
-    .attr('font-size', 10)
-    .attr('fill', (d) => (d.isGap ? '#9a9088' : '#1c1a17'))
-    .attr('font-style', (d) => (d.isGap ? 'italic' : 'normal'))
-    .text((d) => (d.text.length > 9 ? d.text.slice(0, 8) + '…' : d.text))
-  ng.append('title').text((d) => `${d.text}\n→ ${d.witnesses.join(', ')}`)
 }
 
 // ── Resize ───────────────────────────────────────────────────────────────────
@@ -664,12 +580,6 @@ watch([zoom, colOrder], () => {
   if (activeSeg.value !== null) drawWave()
 })
 watch(activeSeg, () => drawWave())
-watch(selectedVariant, () => {
-  if (activeSeg.value !== null) {
-    const data = mockCollate(activeSeg.value)
-    if (variantGraphSvg.value) drawVariantGraph(variantGraphSvg.value, data)
-  }
-})
 watch(
   () => settings.value.sortBy,
   (mode) => applySort(mode),
