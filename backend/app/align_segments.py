@@ -5,7 +5,7 @@ Algorithm:
 1. Strip TEI noise from each <l> element → clean plain text
 2. Build an inverted index of the anchor witness (word → list of positions)
 3. For each witness line, find top-K candidate anchor positions via the index
-4. Score each candidate with Jaccard similarity
+4. Score each candidate with Dice (Sorensen-Dice) similarity
 5. Run O(n log n) LIS (Longest Increasing Subsequence) on the scored pairs
    to enforce a monotonic (no-crossing) alignment
 6. Return alignment table: witness_local_n → anchor_local_n | None, + score
@@ -14,7 +14,7 @@ Key insight about this corpus:
 - The 'n' attribute in these TEI files is WITNESS-LOCAL (resets at 1 for each MS)
 - Every witness needs pure content-based alignment against the anchor
 - LIS enforces monotonicity (order of lines must be preserved)
-- Jaccard on word sets handles Old French spelling variation
+- Dice on word sets handles Old French spelling variation
 """
 
 import re
@@ -25,17 +25,25 @@ from typing import Optional
 from bisect import bisect_left
 from lxml import etree
 
+from .lab_similarity import Bundle, sim_dice
+
 
 # ── Text cleaning ──────────────────────────────────────────────────────────────
 
-DROP_TAGS = {'note', 'erasure', 'crease', 'posthole', 'del'}
+# Local tag names (namespace-agnostic) whose text is editorial/structural noise.
+# Includes Faust-specific tags (fw page numbers, handShift, anchor, g glyphs) so
+# the diplomatic transcripts clean up the same way the align-lab parser does.
+DROP_TAGS = {'note', 'erasure', 'crease', 'posthole', 'del',
+             'fw', 'handShift', 'anchor', 'g'}
 
 
 def clean_line_text(el) -> str:
-    """Extract plain text from a <l>, stripping editorial noise."""
+    """Extract plain text from a line element (<l>/<line>), stripping editorial noise."""
     el = copy.deepcopy(el)
-    for tag in DROP_TAGS:
-        for node in el.iter(tag):
+    for node in list(el.iter()):
+        if node is el:
+            continue
+        if _strip_ns(node.tag) in DROP_TAGS:
             parent = node.getparent()
             if parent is not None:
                 tail = node.tail or ''
@@ -139,24 +147,49 @@ def _contains(el, target) -> bool:
     return False
 
 
+_FAUST_NS = "http://www.faustedition.net/ns"
+
+
+def _line_number(el, fallback: int) -> int:
+    """Line number from f:nx / nx / n (trailing digits), else a sequential fallback.
+    Faust verse lines carry the number in f:nx="t3_42"; <l n="42"> uses a plain n."""
+    raw = el.get(f"{{{_FAUST_NS}}}nx") or el.get('nx') or el.get('n')
+    if raw:
+        m = re.search(r'(\d+)$', raw)
+        if m:
+            return int(m.group(1))
+    return fallback
+
+
 def load_witness(path: Path) -> list:
     """
-    Return list of (local_n: int, clean_text: str).
-    Tries <l> container style first; if none found, falls back to <lb/> milestone style.
+    Return list of (local_n: int, clean_text: str). Handles three TEI dialects:
+      <l>    container / verse lines (incl. Faust <l f:nx="t3_N">)
+      <line> diplomatic page lines (Faust page transcripts)
+      <lb/>  milestone markers (Armenian Matenadaran corpus)
+    Each style is tried in turn; the first that yields lines wins.
     """
     tree = etree.parse(str(path))
     lines = []
-    for l in tree.findall('.//l'):
-        n = l.get('n')
-        text = clean_line_text(l)
-        if n and text:
-            try:
-                lines.append((int(n), text))
-            except ValueError:
-                pass
+
+    # 1. <l> container / verse lines (namespace-agnostic)
+    for el in (e for e in tree.iter() if _strip_ns(e.tag) == 'l'):
+        text = clean_line_text(el)
+        if text:
+            lines.append((_line_number(el, len(lines) + 1), text))
+
+    # 2. <line> diplomatic page lines (Faust page files)
     if not lines:
-        # Milestone style (lb markers with floating tail text)
+        line_els = (e for e in tree.iter() if _strip_ns(e.tag) == 'line')
+        for i, el in enumerate(line_els, start=1):
+            text = clean_line_text(el)
+            if text:
+                lines.append((i, text))
+
+    # 3. <lb/> milestone style (Armenian; tail text follows each marker)
+    if not lines:
         lines = load_witness_lb(tree)
+
     return lines
 
 
@@ -237,13 +270,13 @@ def align_witness(
     Returns list of dicts with keys:
       witness_n, anchor_n (None if unaligned), anchor_pos, score, text, anchor_text
 
-    anchor_sets: optional precomputed list of word-sets for each anchor line.
-    Passing it avoids rebuilding the anchor sets on every comparison, which is a
-    large speed-up when aligning many witnesses against the same anchor.
+    anchor_sets: optional precomputed list of Bundles for each anchor line.
+    Passing it avoids rebuilding the anchor bundles on every comparison, which is
+    a large speed-up when aligning many witnesses against the same anchor.
     """
-    # Precompute anchor word sets once (caller can also pass them in)
+    # Precompute anchor bundles once (caller can also pass them in)
     if anchor_sets is None:
-        anchor_sets = [set(t.split()) for (_n, t) in anchor_lines]
+        anchor_sets = [Bundle(t) for (_n, t) in anchor_lines]
 
     raw_matches: list = []
     for wi, (wn, wt) in enumerate(witness_lines):
@@ -257,19 +290,12 @@ def align_witness(
                         cands[pos] = cands.get(pos, 0) + 1
         if not cands:
             continue
-        # Precompute the witness line's word set once, reuse for all candidates
-        wset = set(w_words)
+        # Precompute the witness line's bundle once, reuse for all candidates
+        wb = Bundle(wt)
         top = sorted(cands.items(), key=lambda x: -x[1])[:top_k]
         best_pos, best_score = -1, 0.0
         for pos, _ in top:
-            aset = anchor_sets[pos]
-            if not wset and not aset:
-                s = 1.0
-            elif not wset or not aset:
-                s = 0.0
-            else:
-                inter = len(wset & aset)
-                s = inter / (len(wset) + len(aset) - inter)
+            s = sim_dice(wb, anchor_sets[pos])
             if s > best_score:
                 best_score = s
                 best_pos = pos

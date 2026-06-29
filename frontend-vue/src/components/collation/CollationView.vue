@@ -95,6 +95,7 @@
               <div
                 v-for="(s, si) in segs"
                 :key="si"
+                :data-id="getSegId(w.id, si)"
                 class="col-seg"
                 :class="{ active: activeSeg === si, highlighted: isHighlighted(w.id, si) }"
                 :style="{
@@ -159,6 +160,7 @@ const {
   getSegText: storeGetSegText,
   alignMatrix,
   getAlignScore,
+  getSegId,
 } = useStore()
 
 // Expose to template
