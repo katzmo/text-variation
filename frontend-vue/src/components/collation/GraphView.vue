@@ -36,8 +36,8 @@ const emit = defineEmits(['hover'])
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const X_STEP = 120
-const HEIGHT = 750
-const MARGIN = { top: 40, right: 120, bottom: 20, left: 120 }
+const HEIGHT = 450
+const MARGIN = { top: 40, right: 120, bottom: 20, left: 20 }
 const INNER_H = HEIGHT - MARGIN.top - MARGIN.bottom
 const PILL_WIDTH = 14
 const LANE_HEIGHT = 6
@@ -254,14 +254,6 @@ function drawGraph() {
     .y((d) => d.y)
     .curve(d3.curveBumpX)
 
-  const yPerTranslation = d3
-    .scalePoint()
-    .domain(allTranslations)
-    .range([0, INNER_H])
-    .padding(0.5)
-
-  const leftX = -MARGIN.left + 10
-
   // ── Sankey layer ──────────────────────────────────────────────────────────
   const sankeyGroup = g.append('g').attr('class', 'sankey').attr('opacity', 1 - props.zoom)
 
@@ -296,17 +288,11 @@ function drawGraph() {
 
   const highlight = (translation) => {
     edgeGroup.selectAll('path').attr('stroke-opacity', 0.1).attr('stroke-width', 4)
-    g.selectAll('.connector').attr('stroke-opacity', 0.1)
-    g.selectAll('.translation-label').attr('opacity', 0.3)
     edgeGroup.select(`.path-${CSS.escape(translation)}`).attr('stroke-opacity', 1).attr('stroke-width', 4).raise()
-    g.select(`.connector-${CSS.escape(translation)}`).attr('stroke-opacity', 1)
-    g.select(`.label-${CSS.escape(translation)}`).attr('opacity', 1).attr('font-weight', 'bold')
   }
 
   const unhighlight = () => {
     edgeGroup.selectAll('path').attr('stroke-opacity', 0.35).attr('stroke-width', 4)
-    g.selectAll('.connector').attr('stroke-opacity', 0.35)
-    g.selectAll('.translation-label').attr('opacity', 1).attr('font-weight', 'normal')
   }
 
   paths.forEach(({ translation, points }) => {
@@ -341,34 +327,6 @@ function drawGraph() {
       .attr('x1', x).attr('x2', x)
       .attr('y1', 0).attr('y2', INNER_H)
       .attr('stroke', '#ccc').attr('stroke-width', 1)
-  })
-
-  // ── Labels + connectors ───────────────────────────────────────────────────
-  paths.forEach(({ translation, points }) => {
-    const labelY = yPerTranslation(translation)
-
-    g.append('text')
-      .attr('x', leftX)
-      .attr('y', labelY + 4)
-      .attr('text-anchor', 'start')
-      .attr('font-size', '10px')
-      .attr('fill', COLOR_SCALE(translation))
-      .attr('cursor', 'pointer')
-      .attr('class', `translation-label label-${CSS.escape(translation)}`)
-      .text(translation)
-      .on('mouseenter', () => { highlight(translation); emit('hover', translation) })
-      .on('mouseleave', () => { unhighlight(); emit('hover', null) })
-
-    if (points.length > 0) {
-      g.append('path')
-        .datum([{ x: leftX + 25, y: labelY }, points[0]])
-        .attr('fill', 'none')
-        .attr('stroke', COLOR_SCALE(translation))
-        .attr('stroke-width', 4)
-        .attr('stroke-opacity', 0.35)
-        .attr('d', line)
-        .attr('class', `connector connector-${CSS.escape(translation)}`)
-    }
   })
 
   // ── Nodes (pills) ─────────────────────────────────────────────────────────
