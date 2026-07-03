@@ -24,19 +24,21 @@
 <script setup>
 import { ref, watch, onMounted } from 'vue'
 import * as d3 from 'd3'
+import { witnessColor } from '../../utils.js'
 
 const props = defineProps({
   data: { type: Array, required: true },       // GraphPosition[]
   translationOrder: { type: Array, required: true },
   hoveredTranslation: { type: String, default: null },
+  selectedWitness: { type: String, default: null },
   zoom: { type: Number, default: 1 },
 })
 
-const emit = defineEmits(['hover'])
+const emit = defineEmits(['hover', 'select'])
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const X_STEP = 120
-const HEIGHT = 450
+const HEIGHT = 750
 const MARGIN = { top: 40, right: 120, bottom: 20, left: 20 }
 const INNER_H = HEIGHT - MARGIN.top - MARGIN.bottom
 const PILL_WIDTH = 14
@@ -45,14 +47,6 @@ const LANE_HEIGHT = 6
 // ── DOM refs / state ──────────────────────────────────────────────────────────
 const svgRef = ref(null)
 const tooltip = ref(null)
-
-// ── Color scale (module-level so it persists across redraws) ──────────────────
-const COLOR_SCALE = d3.scaleOrdinal(d3.schemeTableau10)
-
-function getTranslationColor(translation, allTranslations) {
-  COLOR_SCALE.domain(allTranslations)
-  return COLOR_SCALE(translation)
-}
 
 // ── Pure layout helpers ───────────────────────────────────────────────────────
 function getPillHeight(translationCount) {
@@ -243,11 +237,6 @@ function drawGraph() {
   const flows = buildFlows(props.data, nodes)
   const paths = buildPaths(props.data, nodes, props.translationOrder, 1)
 
-  const allTranslations = props.translationOrder.filter((t) =>
-    props.data.some((p) => p.groups.some((g) => g.translations.includes(t))),
-  )
-  COLOR_SCALE.domain(allTranslations)
-
   const line = d3
     .line()
     .x((d) => d.x)
@@ -286,39 +275,33 @@ function drawGraph() {
   // ── Lines layer ───────────────────────────────────────────────────────────
   const edgeGroup = g.append('g').attr('class', 'edges').attr('opacity', props.zoom)
 
-  const highlight = (translation) => {
-    edgeGroup.selectAll('path').attr('stroke-opacity', 0.1).attr('stroke-width', 4)
-    edgeGroup.select(`.path-${CSS.escape(translation)}`).attr('stroke-opacity', 1).attr('stroke-width', 4).raise()
-  }
-
-  const unhighlight = () => {
-    edgeGroup.selectAll('path').attr('stroke-opacity', 0.35).attr('stroke-width', 4)
-  }
-
   paths.forEach(({ translation, points }) => {
     if (points.length < 2) return
     edgeGroup
       .append('path')
       .datum(points)
       .attr('fill', 'none')
-      .attr('stroke', COLOR_SCALE(translation))
+      .attr('stroke', witnessColor(translation))
       .attr('stroke-width', 4)
       .attr('stroke-opacity', 0.5)
       .attr('d', line)
       .attr('class', `path-${CSS.escape(translation)}`)
+      .style('cursor', 'pointer')
       .on('mouseenter', function (event) {
-        highlight(translation)
         tooltip.value = { x: event.clientX, y: event.clientY, translation }
         emit('hover', translation)
       })
       .on('mouseleave', () => {
-        unhighlight()
         tooltip.value = null
         emit('hover', null)
+      })
+      .on('click', () => {
+        emit('select', translation)
       })
   })
 
   edgeGroup.style('mix-blend-mode', 'multiply')
+  applyHighlight()
 
   // ── Axis lines ────────────────────────────────────────────────────────────
   props.data.forEach((_, pi) => {
@@ -361,22 +344,24 @@ function drawGraph() {
   })
 }
 
+// ── Highlighting ──────────────────────────────────────────────────────────────
+// Hover takes precedence over the persistent witness selection.
+function applyHighlight() {
+  if (!svgRef.value) return
+  const translation = props.hoveredTranslation || props.selectedWitness
+  const edgeGroup = d3.select(svgRef.value).select('.edges')
+  if (translation) {
+    edgeGroup.selectAll('path').attr('stroke-opacity', 0.30).attr('stroke-width', 4)
+    edgeGroup.select(`.path-${CSS.escape(translation)}`).attr('stroke-opacity', 1).attr('stroke-width', 4).raise()
+  } else {
+    edgeGroup.selectAll('path').attr('stroke-opacity', 0.35).attr('stroke-width', 4)
+  }
+}
+
 // ── Watchers ──────────────────────────────────────────────────────────────────
 watch(() => [props.data, props.translationOrder], drawGraph, { deep: true })
 
-watch(
-  () => props.hoveredTranslation,
-  (translation) => {
-    if (!svgRef.value) return
-    const edgeGroup = d3.select(svgRef.value).select('.edges')
-    if (translation) {
-      edgeGroup.selectAll('path').attr('stroke-opacity', 0.1).attr('stroke-width', 4)
-      edgeGroup.select(`.path-${CSS.escape(translation)}`).attr('stroke-opacity', 1).attr('stroke-width', 4).raise()
-    } else {
-      edgeGroup.selectAll('path').attr('stroke-opacity', 0.35).attr('stroke-width', 4)
-    }
-  },
-)
+watch(() => [props.hoveredTranslation, props.selectedWitness], applyHighlight)
 
 watch(
   () => props.zoom,

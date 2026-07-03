@@ -164,8 +164,10 @@
                   :data="graphData"
                   :translation-order="graphTranslationOrder"
                   :hovered-translation="graphHovered"
+                  :selected-witness="selectedWit"
                   :zoom="1"
                   @hover="graphHovered = $event"
+                  @select="selectedWit = $event"
                 />
               </div>
             </div>
@@ -228,9 +230,9 @@ const rowEl = ref(null)
 const minimapEl = ref(null)
 
 // ── Graph view state ──────────────────────────────────────────────────────────
-const graphData = ref([])
+const rawGraphResult = ref(null) // last fetched/mocked { table, witnesses } for the active segment
 const graphHovered = ref(null)
-const graphTranslationOrder = computed(() => colOrder.value.map((w) => w.id))
+const graphTranslationOrder = computed(() => visibleCols.value.map((w) => w.id))
 
 // ── Computed ─────────────────────────────────────────────────────────────────
 const cw = computed(() => Math.max(30, Math.round(zoom.value * 0.68)))
@@ -443,11 +445,15 @@ function drawWave() {
 }
 
 // ── Variant graph ─────────────────────────────────────────────────────────────
+// Re-derived from rawGraphResult so hiding/showing a witness updates the graph
+// without needing to re-fetch or re-mock the collation for the active segment.
 function toGraphData(data) {
   if (!data?.table) return []
+  const visibleIds = new Set(visibleCols.value.map((w) => w.id))
+  const activeWitnesses = data.witnesses.filter((wit) => visibleIds.has(wit))
   return data.table.map((row) => {
     const groups = {}
-    data.witnesses.forEach((wit) => {
+    activeWitnesses.forEach((wit) => {
       const text = row[wit]?.[0]?.t || '-'
       const key = text.toLowerCase() || '__gap__'
       if (!groups[key]) groups[key] = { representative: text || '-', translations: [] }
@@ -456,6 +462,7 @@ function toGraphData(data) {
     return { groups: Object.values(groups) }
   })
 }
+const graphData = computed(() => toGraphData(rawGraphResult.value))
 
 async function pickSeg(si) {
   activeSeg.value = si
@@ -476,7 +483,7 @@ async function pickSeg(si) {
     }
   }
   if (!data) data = mockCollate(si)
-  graphData.value = toGraphData(data)
+  rawGraphResult.value = data
 }
 
 function mockCollate(si) {

@@ -126,11 +126,23 @@ export function normalizeText(t, variation) {
 
 // ── Badge color (stable hash on witness ID) ─────────────────────────────────
 const BADGE_COLORS = ['cb0', 'cb1', 'cb2', 'cb3', 'cb4', 'cb5']
-export function badgeClass(wi, id) {
-  if (!id) return BADGE_COLORS[wi % 6]
+// Saturated accent colors matching each .col-badge.cbN border-color in CollationView's
+// styles, so other views (e.g. the variant graph) can render witnesses in the same hue.
+const BADGE_ACCENTS = ['#999999', '#e09880', '#88c480', '#80a8d4', '#d4c464', '#b490cc']
+
+function badgeIndex(wi, id) {
+  if (!id) return wi % 6
   let hash = 0
   for (let i = 0; i < id.length; i++) hash = (hash << 5) - hash + id.charCodeAt(i)
-  return BADGE_COLORS[Math.abs(hash) % 6]
+  return Math.abs(hash) % 6
+}
+
+export function badgeClass(wi, id) {
+  return BADGE_COLORS[badgeIndex(wi, id)]
+}
+
+export function witnessColor(id) {
+  return BADGE_ACCENTS[badgeIndex(0, id)]
 }
 
 // ── TEI file parsing (browser-side) ─────────────────────────────────────────
