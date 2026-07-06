@@ -8,12 +8,14 @@ number in [0, 1] where 1 = most similar.
 Build a bundle once per unit with make_bundle(text).
 """
 
+from collections import Counter
 
 class Bundle:
     """Precomputed tokens for one text unit, so we don't re-split repeatedly."""
-    __slots__ = ("words", "wset", "bigrams")
+    __slots__ = ("text", "words", "wset", "bigrams")
 
     def __init__(self, text):
+        self.text = text
         self.words = text.split()
         self.wset = set(self.words)
         self.bigrams = set(zip(self.words, self.words[1:]))
@@ -41,6 +43,26 @@ def sim_dice(a, b):
         return 0.0
     inter = len(a.wset & b.wset)
     return 2 * inter / (len(a.wset) + len(b.wset))
+
+
+def sim_multi_dice(a, b):
+    """Sorensen-Dice on all words."""
+    if not a.words and not b.words:
+        return 1.0
+    if not a.words or not b.words:
+        return 0.0
+    inter = sum((Counter(a.words) & Counter(b.words)).values())
+    return 2 * inter / (len(a.words) + len(b.words))
+
+
+def sim_char_dice(a, b):
+    """Sorensen-Dice on all characters."""
+    if not a.text and not b.text:
+        return 1.0
+    if not a.text or not b.text:
+        return 0.0
+    inter = sum((Counter(a.text) & Counter(b.text)).values())
+    return 2 * inter / (len(a.text) + len(b.text))
 
 
 def sim_bigram_jaccard(a, b):
@@ -82,6 +104,42 @@ def sim_word_levenshtein(a, b):
     return 1 - prev[n] / max(m, n)
 
 
+def sim_char_levenshtein(a, b):
+    """Character-level edit distance, normalised to a similarity in [0, 1]."""
+    ta = a.text if isinstance(a, Bundle) else a
+    tb = b.text if isinstance(b, Bundle) else b
+    m, n = len(ta), len(tb)
+    if m == 0 and n == 0:
+        return 1.0
+    if m == 0 or n == 0:
+        return 0.0
+    prev = list(range(n + 1))
+    for i in range(1, m + 1):
+        cur = [i] + [0] * n
+        wai = ta[i - 1]
+        for j in range(1, n + 1):
+            cost = 0 if wai == tb[j - 1] else 1
+            cur[j] = min(cur[j - 1] + 1, prev[j] + 1, prev[j - 1] + cost)
+        prev = cur
+    return 1 - prev[n] / max(m, n)
+
+
+def sim_hybrid_levenshtein(a, b):
+    """
+    Combination of word-level edit distance boosted by character-level edit
+    distance for the words that differ, normalised to a similarity in [0, 1].
+    """
+    word_similarity = sim_word_levenshtein(a, b)
+    char_similarities = []
+    for w1, w2 in zip(a.words, b.words):
+        if w1 != w2:
+            char_similarities.append(sim_char_levenshtein(w1, w2))
+    # Average character similarity (default to 1 if no differing words)
+    char_similarity = sum(char_similarities) / len(char_similarities) if char_similarities else 1.0
+    # Additive hybrid score
+    return word_similarity + (1 - word_similarity) * char_similarity
+
+
 def make_combined(w_jaccard=0.5, w_lev=0.5):
     """Weighted blend of Jaccard (set overlap) and word-Levenshtein (order)."""
     def sim(a, b):
@@ -94,7 +152,11 @@ def make_combined(w_jaccard=0.5, w_lev=0.5):
 SIMILARITIES = {
     "jaccard": sim_jaccard,
     "dice": sim_dice,
+    "dice-all": sim_multi_dice,
+    "dice-char": sim_char_dice,
     "bigram": sim_bigram_jaccard,
     "levenshtein": sim_word_levenshtein,
+    "levenshtein-char": sim_char_levenshtein,
+    "levenshtein-hybrid": sim_hybrid_levenshtein,
     "combined": make_combined(0.5, 0.5),
 }

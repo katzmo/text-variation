@@ -2,12 +2,12 @@
 parsers.py — read TEI witnesses into comparable units.
 
 Two things happen here:
-  1. load_lines(path)  -> [(n, clean_text), ...]   one entry per verse line
+  1. load_segments(path, tags)  -> xml_id, [clean_text, ...] one entry per segment
        Handles BOTH conventional <l>...</l> containers AND the milestone
        <lb n="1"/> style where text floats as tail content after the marker.
   2. group_units(lines, window) -> [unit, ...]      where a unit is a dict
-       {idx, n0, n1, text}. window=1 gives line-level; window=5/10/... merges
-       consecutive lines into larger sections (Katharina's point #1).
+       {idx, n0, n1, text}. window=1 gives 1 segment; window=5/10/... merges
+       consecutive segments into larger sections (Katharina's point #1).
 """
 import re
 from lxml import etree
@@ -65,9 +65,6 @@ def _load_milestone(tree):
     lines = []
     lbs = [el for el in tree.iter() if _local(el.tag) == "lb"]
     for i, lb in enumerate(lbs):
-        n = lb.get("n")
-        if not n:
-            continue
         nxt = lbs[i + 1] if i + 1 < len(lbs) else None
         parts = [lb.tail or ""]
         for el in lb.itersiblings():
@@ -81,30 +78,30 @@ def _load_milestone(tree):
                 break
         text = _clean("".join(parts))
         if text:
-            try:
-                lines.append((int(n), text))
-            except ValueError:
-                pass
+            lines.append(text)
     return lines
 
 
-def load_lines(path):
-    """Return [(line_number, clean_text), ...] for one witness file."""
+def load_segments(path, tags):
+    """Return (xml_id, [clean_text, ...]) for one witness file."""
     tree = etree.parse(str(path))
-    lines = []
-    for l in tree.findall(".//l"):
-        n = l.get("n")
-        if not n:
-            continue
-        text = _clean(_element_text(l))
+    # Is there an ID?
+    xml_id = tree.getroot().get("{http://www.w3.org/XML/1998/namespace}id")
+    # Is there a namespace?
+    if xmlns := tree.getroot().nsmap.get(None):
+        ns = "ns" # custom prefix for the default namespace
+        elements = tree.xpath("|".join(f".//{ns}:body//{ns}:{tag}" for tag in tags), namespaces={ns: xmlns})
+    else:
+        elements = tree.xpath("|".join(f".//body//{tag}" for tag in tags))
+    # Find segments
+    segments = []
+    for el in elements:
+        text = _clean(_element_text(el))
         if text:
-            try:
-                lines.append((int(n), text))
-            except ValueError:
-                pass
-    if not lines:
-        lines = _load_milestone(tree)
-    return lines
+            segments.append(text)
+    if not segments and "lb" in tags:
+        segments = _load_milestone(tree)
+    return xml_id, segments
 
 
 def group_units(lines, window=1):
@@ -116,12 +113,12 @@ def group_units(lines, window=1):
     """
     units = []
     if window <= 1:
-        for i, (n, text) in enumerate(lines):
-            units.append({"idx": i, "n0": n, "n1": n, "text": text})
+        for i, text in enumerate(lines):
+            units.append({"idx": i, "n0": i, "n1": i, "text": text})
         return units
     for i in range(0, len(lines), window):
         chunk = lines[i : i + window]
-        text = " ".join(t for _n, t in chunk)
+        text = " ".join(t for t in chunk)
         units.append({
             "idx": len(units),
             "n0": chunk[0][0],

@@ -14,6 +14,7 @@ python lab.py --list          # list the named configs
 python lab.py --config dice   # run one config + show sample matches
 python lab.py --all-pairs     # every text as anchor (rate matrix)
 python lab.py --data my_dir   # use your own folder of .xml TEI files
+python lab.py --tags ab       # set what xml tags to use as segments
 ```
 
 Requires only Python 3 and `lxml` (`pip install lxml`). Put more TEI files in

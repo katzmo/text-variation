@@ -75,6 +75,8 @@ def two_pass_lis(wit_units, anc_units, wit_b, anc_b, sim_fn,
     W = len(wit_units)
     band = int(band_frac * A) if band_frac else None
 
+    # Find most promising candidates (= most overlapping words)
+    # and calculate their similarity scores
     raw = []
     for wi in range(W):
         wb = wit_b[wi]
@@ -89,24 +91,24 @@ def two_pass_lis(wit_units, anc_units, wit_b, anc_b, sim_fn,
         if not cands:
             continue
         top = sorted(cands.items(), key=lambda x: -x[1])[:top_k]
-        best_pos, best_score = -1, 0.0
         for pos, _ in top:
-            s = sim_fn(wb, anc_b[pos])
+            score = sim_fn(wb, anc_b[pos])
             if pos_weight and A:
-                s -= pos_weight * abs(pos - expected) / A
-            if s > best_score:
-                best_score, best_pos = s, pos
-        if best_score >= threshold:
-            raw.append((wi, best_pos, best_score))
+                score -= pos_weight * abs(pos - expected) / A
+            if score >= threshold:
+                raw.append((wi, pos, score))
 
-    kept = {wi: (ap, sc) for wi, ap, sc in _lis(raw)}
-    out = []
-    for wi in range(W):
-        if wi in kept:
-            ap, sc = kept[wi]
-            out.append({"wit_idx": wi, "anc_idx": ap, "score": round(sc, 4)})
-        else:
-            out.append({"wit_idx": wi, "anc_idx": None, "score": 0.0})
+    # Return the highest scoring pairings found.
+    raw.sort(key=lambda x: -x[2]) # sort by score
+    used_wit_indices = set()
+    used_anc_indices = set()
+    out = [{'wit_idx': wi, 'anc_idx': None, 'score': 0.0} for wi in range(W)]
+
+    for wit_idx, anc_idx, score in raw:
+        if wit_idx not in used_wit_indices and anc_idx not in used_anc_indices:
+            out[wit_idx] = {'wit_idx': wit_idx, 'anc_idx': anc_idx, 'score': round(score, 4)}
+            used_wit_indices.add(wit_idx)
+            used_anc_indices.add(anc_idx)
     return out
 
 
