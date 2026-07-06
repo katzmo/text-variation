@@ -1,12 +1,16 @@
 <script setup>
+import { ref } from 'vue'
 import { useStorage } from '@vueuse/core'
 import TextSequence from '@/components/TextSequence.vue'
+import { useZoom } from '@/composables/zoom'
 
 const documents = useStorage('documents', [], localStorage)
+const zoomWrapper = ref(null)
+useZoom(zoomWrapper)
 </script>
 
 <template>
-  <div id="sequences">
+  <div id="sequences" ref="zoomWrapper">
     <TextSequence
       v-for="(doc, index) in documents"
       :key="index"
@@ -17,6 +21,7 @@ const documents = useStorage('documents', [], localStorage)
 
 <style>
 #sequences {
+  --zoom-level: 0.5;
   --text-color: var(--color-text);
   display: flex;
   column-gap: max(1%, 1rem);
