@@ -17,6 +17,88 @@ export function jaccard(a, b) {
   return inter / (sa.size + sb.size - inter || 1)
 }
 
+// ── Word-level similarity (for variant-graph grouping) ─────────────────────
+export function levenshtein(a, b) {
+  const m = a.length,
+    n = b.length
+  if (!m) return n
+  if (!n) return m
+  const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0))
+  for (let i = 0; i <= m; i++) dp[i][0] = i
+  for (let j = 0; j <= n; j++) dp[0][j] = j
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] =
+        a[i - 1] === b[j - 1]
+          ? dp[i - 1][j - 1]
+          : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1])
+    }
+  }
+  return dp[m][n]
+}
+
+// Normalized similarity in [0,1]; 1 = identical, 0 = completely different.
+export function wordSimilarity(a, b) {
+  if (!a && !b) return 1
+  if (!a || !b) return 0
+  const dist = levenshtein(a.toLowerCase(), b.toLowerCase())
+  return 1 - dist / Math.max(a.length, b.length)
+}
+
+// Groups witnesses at a single collation position into variant clusters:
+// witnesses whose readings are similar enough (>= threshold) end up in the
+// same group, using connected components (readings don't need to be pairwise
+// similar to *everything* in the group, just chained together transitively).
+// currentReading: { witnessId: word }.
+export function groupPositionBySimilarity(currentReading, witnessIds, threshold) {
+  const paired = {}
+  witnessIds.forEach((w) => (paired[w] = new Set([w])))
+  for (let i = 0; i < witnessIds.length; i++) {
+    for (let j = i + 1; j < witnessIds.length; j++) {
+      const a = witnessIds[i],
+        b = witnessIds[j]
+      if (wordSimilarity(currentReading[a], currentReading[b]) < threshold) continue
+      paired[a].add(b)
+      paired[b].add(a)
+    }
+  }
+
+  const visited = new Set()
+  const groups = []
+  witnessIds.forEach((wit) => {
+    if (visited.has(wit)) return
+    const group = new Set()
+    const stack = [wit]
+    while (stack.length) {
+      const current = stack.pop()
+      if (visited.has(current)) continue
+      visited.add(current)
+      group.add(current)
+      paired[current].forEach((connected) => {
+        if (!visited.has(connected)) stack.push(connected)
+      })
+    }
+    groups.push([...group])
+  })
+
+  return groups.map((group) => {
+    const counts = {}
+    group.forEach((w) => {
+      const word = currentReading[w]
+      counts[word] = (counts[word] || 0) + 1
+    })
+    let representative = currentReading[group[0]] || '-'
+    let best = -1
+    for (const [word, c] of Object.entries(counts)) {
+      if (c > best) {
+        best = c
+        representative = word
+      }
+    }
+    return { representative: representative || '-', translations: group }
+  })
+}
+
 // ── UPGMA dendrogram ────────────────────────────────────────────────────────
 export function upgma(ids, getTextFn, sampleIndices = null) {
   const n = ids.length

@@ -61,8 +61,16 @@ function getLaneY(nodeY, laneIndex, totalLanes) {
 
 function getInterpolatedLaneY(nodeY, laneIndex, totalLanes, zoom) {
   const detailY = getLaneY(nodeY, laneIndex, totalLanes)
-  const sankeyY = nodeY
-  return sankeyY * (1 - zoom) + detailY * zoom
+  const bundledY = nodeY
+  return bundledY * (1 - zoom) + detailY * zoom
+}
+
+// zoom = 1 -> full lane-based pill height (detail); zoom = 0 -> collapses to a
+// small circle (width == height) matching the bundled lines converging on it.
+function getInterpolatedPillHeight(translationCount, zoom) {
+  const detailHeight = getPillHeight(translationCount)
+  const bundledHeight = PILL_WIDTH
+  return bundledHeight * (1 - zoom) + detailHeight * zoom
 }
 
 function resolveCollisions(nodes) {
@@ -188,39 +196,6 @@ function buildPaths(data, nodes, translationOrder, zoom) {
   })
 }
 
-function buildFlows(data, nodes) {
-  const flows = []
-  data.forEach((_, pi) => {
-    if (pi === data.length - 1) return
-    nodes[pi].forEach((fromNode) => {
-      const destinations = new Map()
-      fromNode.translations.forEach((t) => {
-        const toNode = nodes[pi + 1].find((n) => n.translations.includes(t))
-        if (!toNode) return
-        if (!destinations.has(toNode)) destinations.set(toNode, [])
-        destinations.get(toNode).push(t)
-      })
-      destinations.forEach((translations, toNode) => {
-        flows.push({ fromNode, toNode, translations })
-      })
-    })
-  })
-  return flows
-}
-
-function ribbonPath(x0, y0, x1, y1, bandHeight) {
-  const cx0 = x0 + (x1 - x0) * 0.4
-  const cx1 = x0 + (x1 - x0) * 0.6
-  const half = bandHeight / 2
-  return [
-    `M ${x0} ${y0 - half}`,
-    `C ${cx0} ${y0 - half}, ${cx1} ${y1 - half}, ${x1} ${y1 - half}`,
-    `L ${x1} ${y1 + half}`,
-    `C ${cx1} ${y1 + half}, ${cx0} ${y0 + half}, ${x0} ${y0 + half}`,
-    `Z`,
-  ].join(' ')
-}
-
 // ── Draw ──────────────────────────────────────────────────────────────────────
 function drawGraph() {
   if (!svgRef.value || props.data.length === 0) return
@@ -234,8 +209,10 @@ function drawGraph() {
   const totalWidth = innerW + MARGIN.left + MARGIN.right
   svg.attr('width', totalWidth).attr('height', HEIGHT)
 
-  const flows = buildFlows(props.data, nodes)
-  const paths = buildPaths(props.data, nodes, props.translationOrder, 1)
+  // zoom = 1 spreads each witness into its own lane (full detail); zoom = 0
+  // collapses every witness in a node onto the same point, so overlapping
+  // lines read as a single bundled flow between nodes.
+  const paths = buildPaths(props.data, nodes, props.translationOrder, props.zoom)
 
   const line = d3
     .line()
@@ -243,37 +220,8 @@ function drawGraph() {
     .y((d) => d.y)
     .curve(d3.curveBumpX)
 
-  // ── Sankey layer ──────────────────────────────────────────────────────────
-  const sankeyGroup = g.append('g').attr('class', 'sankey').attr('opacity', 1 - props.zoom)
-
-  flows.forEach(({ fromNode, toNode, translations }) => {
-    const fromIndices = translations
-      .map((t) => fromNode.translations.indexOf(t))
-      .filter((i) => i !== -1)
-      .sort((a, b) => a - b)
-    const toIndices = translations
-      .map((t) => toNode.translations.indexOf(t))
-      .filter((i) => i !== -1)
-      .sort((a, b) => a - b)
-
-    const fromMidLane = fromIndices[Math.floor(fromIndices.length / 2)]
-    const toMidLane = toIndices[Math.floor(toIndices.length / 2)]
-    const fromY = getLaneY(fromNode.y, fromMidLane, fromNode.translations.length)
-    const toY = getLaneY(toNode.y, toMidLane, toNode.translations.length)
-    const bandHeight = translations.length * LANE_HEIGHT
-
-    sankeyGroup
-      .append('path')
-      .attr('d', ribbonPath(fromNode.x + PILL_WIDTH / 2, fromY, toNode.x - PILL_WIDTH / 2, toY, bandHeight))
-      .attr('fill', '#ccc')
-      .attr('fill-opacity', 0.6)
-      .attr('stroke', '#ccc')
-      .attr('stroke-width', 0.5)
-      .attr('stroke-opacity', 0.8)
-  })
-
   // ── Lines layer ───────────────────────────────────────────────────────────
-  const edgeGroup = g.append('g').attr('class', 'edges').attr('opacity', props.zoom)
+  const edgeGroup = g.append('g').attr('class', 'edges')
 
   paths.forEach(({ translation, points }) => {
     if (points.length < 2) return
@@ -318,7 +266,7 @@ function drawGraph() {
       (a, b) => b.translations.length - a.translations.length,
     )
     sortedBySize.forEach((node) => {
-      const pillHeight = getPillHeight(node.translations.length)
+      const pillHeight = getInterpolatedPillHeight(node.translations.length, props.zoom)
       const pillX = node.x - PILL_WIDTH / 2
       const pillY = node.y - pillHeight / 2
       const radius = PILL_WIDTH / 2
@@ -359,19 +307,11 @@ function applyHighlight() {
 }
 
 // ── Watchers ──────────────────────────────────────────────────────────────────
-watch(() => [props.data, props.translationOrder], drawGraph, { deep: true })
+// zoom changes node y-positions (see buildPaths), so it needs a full redraw,
+// not just an attribute tweak.
+watch(() => [props.data, props.translationOrder, props.zoom], drawGraph, { deep: true })
 
 watch(() => [props.hoveredTranslation, props.selectedWitness], applyHighlight)
-
-watch(
-  () => props.zoom,
-  (zoom) => {
-    if (!svgRef.value) return
-    const svg = d3.select(svgRef.value)
-    svg.select('.edges').attr('opacity', zoom)
-    svg.select('.sankey').attr('opacity', 1 - zoom)
-  },
-)
 
 onMounted(drawGraph)
 </script>

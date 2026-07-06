@@ -170,14 +170,42 @@
             </div>
             <!-- Variant graph -->
             <div class="vg-strip">
-              <div class="vg-strip-title">Variant graph</div>
+              <div class="vg-strip-header">
+                <div class="vg-strip-title">Variant graph</div>
+                <div class="vg-strip-controls">
+                  <div class="vg-strip-threshold">
+                    <span>merge threshold</span>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      v-model.number="graphThreshold"
+                      :title="'Readings at least ' + Math.round(graphThreshold * 100) + '% similar are merged'"
+                    />
+                    <span>{{ graphThreshold.toFixed(2) }}</span>
+                  </div>
+                  <div class="vg-strip-threshold">
+                    <span>bundled ⟷ detail</span>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      v-model.number="graphZoom"
+                      title="0 = witness lines bundled into one flow per node, 1 = full per-witness detail"
+                    />
+                    <span>{{ graphZoom.toFixed(2) }}</span>
+                  </div>
+                </div>
+              </div>
               <div class="vg-strip-scroll">
                 <GraphView
                   :data="graphData"
                   :translation-order="graphTranslationOrder"
                   :hovered-translation="graphHovered"
                   :selected-witness="selectedWit"
-                  :zoom="1"
+                  :zoom="graphZoom"
                   @hover="graphHovered = $event"
                   @select="selectedWit = $event"
                 />
@@ -196,7 +224,14 @@ import * as d3 from 'd3'
 import CollationSettings from './CollationSettings.vue'
 import GraphView from './GraphView.vue'
 import { useStore } from '../../composables/useStore.js'
-import { jaccard, upgma, leafOrder, normalizeText, badgeClass as _badgeClass } from '../../utils.js'
+import {
+  jaccard,
+  upgma,
+  leafOrder,
+  normalizeText,
+  badgeClass as _badgeClass,
+  groupPositionBySimilarity,
+} from '../../utils.js'
 import { postCollate } from '../../api.js'
 
 const {
@@ -248,6 +283,11 @@ const bodyEl = ref(null)
 const rawGraphResult = ref(null) // last fetched/mocked { table, witnesses } for the active segment
 const graphHovered = ref(null)
 const graphTranslationOrder = computed(() => visibleCols.value.map((w) => w.id))
+// 1 = only merge identical readings (old behaviour); lower to fuse near-spellings
+// (e.g. "colour"/"color") into one variant-graph node.
+const graphThreshold = ref(1)
+// 0 = witness lines bundled into one flow per node, 1 = full per-witness detail.
+const graphZoom = ref(1)
 
 // ── Computed ─────────────────────────────────────────────────────────────────
 const cw = computed(() => Math.max(30, Math.round(zoom.value * 0.68)))
@@ -467,14 +507,13 @@ function toGraphData(data) {
   const visibleIds = new Set(visibleCols.value.map((w) => w.id))
   const activeWitnesses = data.witnesses.filter((wit) => visibleIds.has(wit))
   return data.table.map((row) => {
-    const groups = {}
+    const currentReading = {}
     activeWitnesses.forEach((wit) => {
-      const text = row[wit]?.[0]?.t || '-'
-      const key = text.toLowerCase() || '__gap__'
-      if (!groups[key]) groups[key] = { representative: text || '-', translations: [] }
-      groups[key].translations.push(wit)
+      currentReading[wit] = row[wit]?.[0]?.t || '-'
     })
-    return { groups: Object.values(groups) }
+    return {
+      groups: groupPositionBySimilarity(currentReading, activeWitnesses, graphThreshold.value),
+    }
   })
 }
 const graphData = computed(() => toGraphData(rawGraphResult.value))
@@ -1116,12 +1155,35 @@ defineExpose({ segs, colOrder, tree })
   padding: 8px 12px;
   background: var(--bg);
 }
+.vg-strip-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
 .vg-strip-title {
   font-family: var(--serif);
   font-size: 11px;
   font-weight: 700;
-  margin-bottom: 6px;
   color: var(--ink);
+}
+.vg-strip-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.vg-strip-threshold {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--ink3);
+}
+.vg-strip-threshold input[type='range'] {
+  width: 80px;
+  height: 3px;
+  accent-color: var(--ink);
 }
 .vg-strip-scroll {
   overflow-x: auto;
