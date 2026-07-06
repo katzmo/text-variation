@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import Modal from '@/components/Modal.vue'
+import DocumentTei from '@/components/DocumentTei.vue'
 import IconDocument from './icons/IconDocument.vue'
 
 const props = defineProps({
@@ -8,19 +9,26 @@ const props = defineProps({
 })
 
 const isModalOpen = ref(false)
+const isSource = ref(false)
 </script>
 
 <template>
   <li>
     <span>{{ document.name }}</span>
-    <span
-      ><button @click="isModalOpen = true" aria-label="view document">
-        <IconDocument aria-hidden /></button
-    ></span>
+    <span>
+      <button @click="isModalOpen = true" aria-label="view document">
+        <IconDocument aria-hidden />
+      </button>
+    </span>
   </li>
   <Modal v-model="isModalOpen">
+    <nav>
+      <button v-if="!isSource" @click="isSource = true">View source</button>
+      <button v-if="isSource" @click="isSource = false">View text</button>
+    </nav>
     <h2>{{ document.name }}</h2>
-    <div class="source">
+    <DocumentTei v-if="!isSource" :xmlString="document.content" class="text" />
+    <div v-if="isSource" class="source">
       <code>{{ document.content }}</code>
     </div>
   </Modal>
@@ -35,7 +43,7 @@ li {
   padding: 0.5em 0;
 }
 
-button {
+li button {
   --color-button: none;
   --color-button-hover: none;
   --color-button-active: none;
@@ -44,10 +52,14 @@ button {
   padding: 0.25em 0.5em;
 }
 
+.text,
 .source {
   max-width: 50rem;
+  margin: var(--margin);
+}
+
+.source {
   white-space: preserve;
   font-family: monospace;
-  margin: var(--margin);
 }
 </style>
