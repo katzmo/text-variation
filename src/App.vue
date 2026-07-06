@@ -1,7 +1,13 @@
 <script setup>
 import { RouterView } from 'vue-router'
+import DocumentList from './views/DocumentList.vue'
 </script>
 
 <template>
-  <RouterView />
+  <aside>
+    <DocumentList />
+  </aside>
+  <main>
+    <RouterView />
+  </main>
 </template>

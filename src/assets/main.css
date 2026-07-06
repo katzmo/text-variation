@@ -1,8 +1,14 @@
-@import './base.css';
+@import "./base.css";
 
 #app {
-  max-width: 1280px;
   margin: 0 auto;
   padding: 2rem;
   font-weight: normal;
+  display: grid;
+  grid-template-columns: 16rem 1fr;
+}
+
+.no-list {
+  list-style: none;
+  padding-inline-start: 0;
 }
