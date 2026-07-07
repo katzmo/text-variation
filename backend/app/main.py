@@ -379,28 +379,33 @@ def health():
 # ── Alignment ──────────────────────────────────────────────────────
 # In-memory store of the most recent alignment run, keyed by witness id.
 _ALIGN_CACHE: dict = {}
-_ALIGN_ANCHOR: dict = {"id": None}
+# "unit" is the segmentation label of the last run (from the --tags option, e.g.
+# "p-lg"); "" means default line-level. It feeds the seg_id scheme below.
+_ALIGN_ANCHOR: dict = {"id": None, "unit": ""}
 
 # Cache of parsed witness lines so each file is read from disk only once.
-# Keyed by witness id; value is (mtime, lines). Re-parses only if the file changed.
+# Keyed by (witness id, tags tuple); value is (mtime, lines). Re-parses only if
+# the file changed or a different set of segmentation tags is requested.
 _LINES_CACHE: dict = {}
 
 from . import align_segments as _align
 from .lab_similarity import Bundle, hybrid_score
 
 
-def _load_lines_cached(path: Path) -> list:
-    """Load (and cache) the parsed lines for a witness file."""
+def _load_lines_cached(path: Path, tags: list = None) -> list:
+    """Load (and cache) the parsed segments for a witness file. `tags` (e.g.
+    ['p', 'lg']) segments by those TEI tags; None/empty keeps line-level."""
     wid = path.stem
     try:
         mtime = path.stat().st_mtime
     except OSError:
         mtime = 0
-    cached = _LINES_CACHE.get(wid)
+    key = (wid, tuple(tags) if tags else ())
+    cached = _LINES_CACHE.get(key)
     if cached and cached[0] == mtime:
         return cached[1]
-    lines = _align.load_witness(path)
-    _LINES_CACHE[wid] = (mtime, lines)
+    lines = _align.load_witness(path, tags=tags)
+    _LINES_CACHE[key] = (mtime, lines)
     return lines
 
 
@@ -425,6 +430,8 @@ class AlignRunRequest(BaseModel):
     anchor_id: str
     threshold: float = 0.35
     top_k: int = 15
+    # Comma-separated TEI tags to use as segments (e.g. "p,lg"). Empty = lines.
+    tags: str = ""
 
 
 @app.post("/api/align/run")
@@ -434,14 +441,19 @@ def align_run(req: AlignRunRequest):
     if not anchor_path.exists():
         raise HTTPException(404, f"Anchor {req.anchor_id} not found")
 
-    anchor_lines = _load_lines_cached(anchor_path)
+    # Segmentation tags: "p,lg" -> ['p','lg']; empty -> None (default line-level).
+    tag_list = [t.strip() for t in req.tags.split(",") if t.strip()]
+    unit = "-".join(tag_list)  # "" keeps the original "{wid}:{pos}" seg_id scheme
+
+    anchor_lines = _load_lines_cached(anchor_path, tags=tag_list)
     if not anchor_lines:
-        raise HTTPException(400, f"Anchor {req.anchor_id} has no readable lines")
+        raise HTTPException(400, f"Anchor {req.anchor_id} has no readable segments")
     anchor_idx = _align.build_index(anchor_lines)
     anchor_sets = [Bundle(t) for (_n, t) in anchor_lines]  # built once, reused
 
     _ALIGN_CACHE.clear()
     _ALIGN_ANCHOR["id"] = req.anchor_id
+    _ALIGN_ANCHOR["unit"] = unit
     witnesses_stats = {}
 
     for f in sorted(DATA_DIR.glob("*.xml")):
@@ -456,7 +468,7 @@ def align_run(req: AlignRunRequest):
                 for i, (n, t) in enumerate(anchor_lines)
             ]
         else:
-            lines = _load_lines_cached(f)
+            lines = _load_lines_cached(f, tags=tag_list)
             alignment = _align.align_witness(
                 lines, anchor_lines, anchor_idx,
                 threshold=req.threshold, top_k=req.top_k,
@@ -520,6 +532,14 @@ def align_matrix(max_rows: int = 0):
         n_rows = max_rows
         anchor_lines = anchor_lines[:n_rows]
 
+    # seg_id scheme: "{wid}:{unit}:{pos}" when a segmentation unit is set (e.g.
+    # "p-lg"), else the original "{wid}:{pos}". Same string in the DOM data-id,
+    # the score keys, and the API — an opaque, deterministic document-order id.
+    unit = _ALIGN_ANCHOR.get("unit") or ""
+
+    def _seg_id(wid: str, pos: int) -> str:
+        return f"{wid}:{unit}:{pos}" if unit else f"{wid}:{pos}"
+
     witnesses = sorted(_ALIGN_CACHE.keys())
     cells = {}
     for wid in witnesses:
@@ -527,7 +547,7 @@ def align_matrix(max_rows: int = 0):
         if wid == anchor_id:
             for pos in range(n_rows):
                 row[pos] = {"score": 1.0, "text": anchor_alignment[pos]["text"],
-                            "seg_id": f"{wid}:{pos}"}
+                            "seg_id": _seg_id(wid, pos)}
         else:
             for a in _ALIGN_CACHE[wid]:
                 pos = a.get("anchor_pos")
@@ -536,7 +556,7 @@ def align_matrix(max_rows: int = 0):
                     prev = row[pos]
                     if prev is None or a["score"] > prev["score"]:
                         row[pos] = {"score": a["score"], "text": a["text"],
-                                    "seg_id": f"{wid}:{pos}"}
+                                    "seg_id": _seg_id(wid, pos)}
         cells[wid] = row
 
     # Hybrid-Levenshtein pairwise scoring: for every anchor row, score every
@@ -563,7 +583,8 @@ def align_matrix(max_rows: int = 0):
 @app.get("/api/align/score")
 def align_score(seg_a: str, seg_b: str):
     """Look up the stored hybrid-Levenshtein score for a pair of segment IDs
-    (scheme: "{witness_id}:{anchor_pos}"), as computed by /api/align/matrix."""
+    (scheme: "{witness_id}:{anchor_pos}", or "{witness_id}:{unit}:{anchor_pos}"
+    when a segmentation unit was used), as computed by /api/align/matrix."""
     score = _scores_db.get_score(seg_a, seg_b)
     if score is None:
         raise HTTPException(404, "No stored score for this segment pair.")

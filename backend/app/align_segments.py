@@ -147,6 +147,68 @@ def _contains(el, target) -> bool:
     return False
 
 
+# Editorial tags dropped from a tag-unit's text. Mirrors align-lab parsers.py
+# DROP_TAGS so segmenting by --tags here matches Katharina's CLI exactly.
+_TAG_DROP = {'note', 'del', 'erasure', 'crease', 'posthole'}
+
+
+def _tag_element_text(el) -> str:
+    """Concatenate the descendant text of a tag-unit element, skipping editorial
+    noise. Namespace-agnostic port of align-lab parsers._element_text (which
+    joins each node's .text, not its tail)."""
+    parts = []
+    for node in el.iter():
+        if _strip_ns(node.tag) in _TAG_DROP:
+            continue
+        parts.append(node.text or '')
+    return ''.join(parts)
+
+
+def _xpath_tags(tree, tags: list, within_body: bool):
+    """Elements whose local name is one of `tags`, in document order.
+    Mirrors align-lab parsers.load_segments: namespaced via the default xmlns,
+    optionally scoped to <body>."""
+    root = tree.getroot()
+    xmlns = root.nsmap.get(None) if hasattr(root, 'nsmap') else None
+    if xmlns:
+        step = "ns:body//ns:" if within_body else "ns:"
+        expr = "|".join(f".//{step}{t}" for t in tags)
+        return tree.xpath(expr, namespaces={"ns": xmlns})
+    step = "body//" if within_body else ""
+    expr = "|".join(f".//{step}{t}" for t in tags)
+    return tree.xpath(expr)
+
+
+def _has_body(tree) -> bool:
+    """True if the document contains a <body> element (namespace-agnostic)."""
+    return any(_strip_ns(e.tag) == 'body' for e in tree.iter())
+
+
+def load_witness_tags(tree, tags: list) -> list:
+    """
+    Segment a witness by arbitrary TEI tags (e.g. ['p', 'lg']) instead of lines.
+    Ports align-lab parsers.load_segments: collect every element whose local name
+    is one of `tags` (preferring those inside <body>), in document order; each
+    becomes one segment. Falls back to <lb/> milestones if 'lb' is requested and
+    nothing else matched. Returns list of (seq_index, clean_text).
+    """
+    elements = _xpath_tags(tree, tags, within_body=True)
+    if not elements and not _has_body(tree):
+        # Only when the file has no <body> at all: retry over the whole tree so a
+        # tag the user typed still segments. (When a <body> exists we stay scoped
+        # to it, like align-lab's CLI, to avoid grabbing teiHeader content.)
+        elements = _xpath_tags(tree, tags, within_body=False)
+
+    segments = []
+    for el in elements:
+        text = _clean_text_string(_tag_element_text(el))
+        if text:
+            segments.append((len(segments) + 1, text))
+    if not segments and 'lb' in tags:
+        segments = load_witness_lb(tree)
+    return segments
+
+
 _FAUST_NS = "http://www.faustedition.net/ns"
 
 
@@ -161,15 +223,23 @@ def _line_number(el, fallback: int) -> int:
     return fallback
 
 
-def load_witness(path: Path) -> list:
+def load_witness(path: Path, tags: Optional[list] = None) -> list:
     """
-    Return list of (local_n: int, clean_text: str). Handles three TEI dialects:
+    Return list of (local_n: int, clean_text: str).
+
+    If `tags` is given (e.g. ['p', 'lg']), segment by those TEI tags instead of
+    lines — this is the "tags to use as segments" option, mirroring align-lab's
+    --tags CLI. Otherwise fall back to the default line-level cascade over three
+    TEI dialects, tried in turn (first that yields lines wins):
       <l>    container / verse lines (incl. Faust <l f:nx="t3_N">)
       <line> diplomatic page lines (Faust page transcripts)
       <lb/>  milestone markers (Armenian Matenadaran corpus)
-    Each style is tried in turn; the first that yields lines wins.
     """
     tree = etree.parse(str(path))
+
+    if tags:
+        return load_witness_tags(tree, tags)
+
     lines = []
 
     # 1. <l> container / verse lines (namespace-agnostic)

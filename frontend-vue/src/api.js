@@ -55,11 +55,11 @@ export async function fetchAlignWitnesses() {
   return r.json()
 }
 
-export async function postRunAlignment(anchorId, threshold, topK = 15) {
+export async function postRunAlignment(anchorId, threshold, topK = 15, tags = '') {
   const r = await fetch(`${API}/align/run`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ anchor_id: anchorId, threshold, top_k: topK }),
+    body: JSON.stringify({ anchor_id: anchorId, threshold, top_k: topK, tags }),
   })
   if (!r.ok) throw new Error('Alignment failed')
   return r.json()

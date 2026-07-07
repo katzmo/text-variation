@@ -156,6 +156,23 @@
           </div>
           <div class="align-thresh-desc">{{ threshDesc }}</div>
         </div>
+        <div class="align-ctrl-group">
+          <label class="align-ctrl-label">Segment by tags</label>
+          <input
+            type="text"
+            v-model="tags"
+            placeholder="e.g. p,lg — blank = lines"
+            style="
+              width: 200px;
+              padding: 6px 8px;
+              font-size: 12px;
+              font-family: var(--mono);
+            "
+          />
+          <div class="align-thresh-desc">
+            Comma-separated TEI tags to use as segments. Leave blank for line-level.
+          </div>
+        </div>
         <button
           class="btn-primary"
           style="padding: 7px 18px; font-size: 12px"
@@ -266,6 +283,8 @@ const witList = ref([])
 const suggested = ref('')
 const anchorId = ref('')
 const threshold = ref(0.35)
+// Comma-separated TEI tags to segment by (e.g. "p,lg"). Empty = line-level.
+const tags = ref('')
 const results = ref(null)
 const inspectWit = ref(null)
 const mode = ref('one')
@@ -302,7 +321,7 @@ async function runAlignment() {
   status.value = 'Running alignment…'
   results.value = null
   try {
-    results.value = await postRunAlignment(anchorId.value, threshold.value)
+    results.value = await postRunAlignment(anchorId.value, threshold.value, 15, tags.value)
     // Pull the anchor-indexed grid into the store so the collation heatmap uses real data
     status.value = 'Loading alignment grid…'
     try {
