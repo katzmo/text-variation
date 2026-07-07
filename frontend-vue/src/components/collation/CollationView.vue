@@ -133,9 +133,49 @@
         <div class="col-detail-body" v-if="detOpen">
           <!-- Variant graph -->
           <div class="vg-strip">
-            <h3 class="vg-strip-title">Variant graph</h3>
+            <div class="vg-strip-header">
+              <div class="vg-strip-title">Variant graph</div>
+              <div class="vg-strip-controls">
+                <div class="vg-strip-threshold">
+                  <span>merge threshold</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    v-model.number="graphThreshold"
+                    :title="
+                      'Readings at least ' +
+                      Math.round(graphThreshold * 100) +
+                      '% similar are merged'
+                    "
+                  />
+                  <span>{{ graphThreshold.toFixed(2) }}</span>
+                </div>
+                <div class="vg-strip-threshold">
+                  <span>bundled ⟷ detail</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    v-model.number="graphZoom"
+                    title="0 = witness lines bundled into one flow per node, 1 = full per-witness detail"
+                  />
+                  <span>{{ graphZoom.toFixed(2) }}</span>
+                </div>
+              </div>
+            </div>
             <div class="vg-strip-scroll">
-              <svg ref="variantGraphSvg" style="display: block"></svg>
+              <GraphView
+                :data="graphData"
+                :translation-order="graphTranslationOrder"
+                :hovered-translation="graphHovered"
+                :selected-witness="selectedWit"
+                :zoom="graphZoom"
+                @hover="graphHovered = $event"
+                @select="selectedWit = $event"
+              />
             </div>
           </div>
         </div>
@@ -148,8 +188,16 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import * as d3 from 'd3'
 import CollationSettings from './CollationSettings.vue'
+import GraphView from './GraphView.vue'
 import { useStore } from '../../composables/useStore.js'
-import { jaccard, upgma, leafOrder, normalizeText, badgeClass as _badgeClass } from '../../utils.js'
+import {
+  jaccard,
+  upgma,
+  leafOrder,
+  normalizeText,
+  badgeClass as _badgeClass,
+  groupPositionBySimilarity,
+} from '../../utils.js'
 import { postCollate } from '../../api.js'
 
 const {
@@ -193,7 +241,16 @@ const dendroSvg = ref(null)
 const scrollEl = ref(null)
 const rowEl = ref(null)
 const minimapEl = ref(null)
-const variantGraphSvg = ref(null)
+
+// ── Graph view state ──────────────────────────────────────────────────────────
+const rawGraphResult = ref(null) // last fetched/mocked { table, witnesses } for the active segment
+const graphHovered = ref(null)
+const graphTranslationOrder = computed(() => visibleCols.value.map((w) => w.id))
+// 1 = only merge identical readings (old behaviour); lower to fuse near-spellings
+// (e.g. "colour"/"color") into one variant-graph node.
+const graphThreshold = ref(1)
+// 0 = witness lines bundled into one flow per node, 1 = full per-witness detail.
+const graphZoom = ref(1)
 
 // ── Computed ─────────────────────────────────────────────────────────────────
 const cw = computed(() => Math.max(30, Math.round(zoom.value * 0.68)))
@@ -414,6 +471,24 @@ function drawWave() {
 }
 
 // ── Variant graph ─────────────────────────────────────────────────────────────
+// Re-derived from rawGraphResult so hiding/showing a witness updates the graph
+// without needing to re-fetch or re-mock the collation for the active segment.
+function toGraphData(data) {
+  if (!data?.table) return []
+  const visibleIds = new Set(visibleCols.value.map((w) => w.id))
+  const activeWitnesses = data.witnesses.filter((wit) => visibleIds.has(wit))
+  return data.table.map((row) => {
+    const currentReading = {}
+    activeWitnesses.forEach((wit) => {
+      currentReading[wit] = row[wit]?.[0]?.t || '-'
+    })
+    return {
+      groups: groupPositionBySimilarity(currentReading, activeWitnesses, graphThreshold.value),
+    }
+  })
+}
+const graphData = computed(() => toGraphData(rawGraphResult.value))
+
 async function pickSeg(si) {
   activeSeg.value = si
   drawWave()
@@ -433,7 +508,7 @@ async function pickSeg(si) {
     }
   }
   if (!data) data = mockCollate(si)
-  if (variantGraphSvg.value) drawVariantGraph(variantGraphSvg.value, data)
+  rawGraphResult.value = data
 }
 
 function mockCollate(si) {
@@ -453,115 +528,6 @@ function mockCollate(si) {
     table.push(row)
   }
   return { table, witnesses: tokens.map((t) => t.id) }
-}
-
-function drawVariantGraph(svgEl, data) {
-  if (!svgEl || !data?.table) return
-  const table = data.table
-  const wits = data.witnesses
-  const nodes = []
-  const links = []
-  const prevNode = {}
-  table.forEach((row, colIdx) => {
-    const groups = {}
-    wits.forEach((wit) => {
-      const tok = row[wit]
-      const text = tok?.[0]?.t || ''
-      const key = text.toLowerCase() || '__gap__'
-      if (!groups[key])
-        groups[key] = {
-          id: `c${colIdx}_${key}`,
-          text: text || '—',
-          isGap: !text,
-          colIdx,
-          witnesses: [],
-        }
-      groups[key].witnesses.push(wit)
-    })
-    Object.values(groups).forEach((node, i) => {
-      node.yOffset = (i - (Object.values(groups).length - 1) / 2) * 32
-      nodes.push(node)
-    })
-    wits.forEach((wit) => {
-      const text = row[wit]?.[0]?.t || ''
-      const key = text.toLowerCase() || '__gap__'
-      const curId = `c${colIdx}_${key}`
-      if (colIdx > 0 && prevNode[wit]) {
-        let link = links.find((l) => l.source === prevNode[wit] && l.target === curId)
-        if (!link) {
-          link = { source: prevNode[wit], target: curId, weight: 0, witnesses: [] }
-          links.push(link)
-        }
-        link.weight++
-        link.witnesses.push(wit)
-      }
-      prevNode[wit] = curId
-    })
-  })
-
-  const colSpacing = 90
-  const nodeW = 64
-  const W = Math.max(600, table.length * colSpacing + 80)
-  const H = 180
-  nodes.forEach((n) => {
-    n.x = n.colIdx * colSpacing
-    n.y = n.yOffset
-  })
-  const linkData = links
-    .map((l) => ({
-      ...l,
-      sn: nodes.find((n) => n.id === l.source),
-      tn: nodes.find((n) => n.id === l.target),
-    }))
-    .filter((l) => l.sn && l.tn)
-  const selVar = (selectedVariant.value || '').toLowerCase()
-
-  const svg = d3.select(svgEl).attr('width', W).attr('height', H)
-  svg.selectAll('*').remove()
-  const g = svg.append('g').attr('transform', `translate(40,${H / 2})`)
-  g.selectAll('.vg-link')
-    .data(linkData)
-    .join('path')
-    .attr('class', 'vg-link')
-    .attr(
-      'd',
-      (d) =>
-        `M${d.sn.x} ${d.sn.y} C${d.sn.x + colSpacing / 2.5} ${d.sn.y},${d.tn.x - colSpacing / 2.5} ${d.tn.y},${d.tn.x} ${d.tn.y}`,
-    )
-    .attr('fill', 'none')
-    .attr('stroke', '#bbb4a4')
-    .attr('stroke-width', (d) => Math.max(1, Math.min(8, d.weight * 1.4)))
-    .attr('opacity', 0.55)
-    .append('title')
-    .text((d) => `${d.witnesses.join(', ')} (${d.weight})`)
-  const ng = g
-    .selectAll('.vg-node')
-    .data(nodes)
-    .join('g')
-    .attr('class', 'vg-node')
-    .attr('transform', (d) => `translate(${d.x},${d.y})`)
-  ng.append('rect')
-    .attr('x', -nodeW / 2)
-    .attr('y', -11)
-    .attr('width', nodeW)
-    .attr('height', 22)
-    .attr('rx', 11)
-    .attr('fill', (d) =>
-      selVar && d.text.toLowerCase().includes(selVar) ? '#f0d090' : d.isGap ? '#f0ede6' : '#fff',
-    )
-    .attr('stroke', (d) =>
-      selVar && d.text.toLowerCase().includes(selVar) ? '#c8860a' : '#ccc4b4',
-    )
-    .attr('stroke-width', (d) => (selVar && d.text.toLowerCase().includes(selVar) ? 2 : 1))
-  ng.append('text')
-    .attr('text-anchor', 'middle')
-    .attr('dominant-baseline', 'middle')
-    .attr('font-family', 'var(--mono)')
-    .attr('font-size', 10)
-    .attr('fill', (d) => (d.isGap ? '#9a9088' : '#1c1a17'))
-    .attr('font-style', (d) => (d.isGap ? 'italic' : 'normal'))
-    .text((d) => (d.text.length > 9 ? d.text.slice(0, 8) + '…' : d.text))
-  ng.append('title').text((d) => `${d.text}\n→ ${d.witnesses.join(', ')}`)
 }
 
 // ── Resize ───────────────────────────────────────────────────────────────────
@@ -646,12 +612,6 @@ watch([zoom, colOrder], () => {
   if (activeSeg.value !== null) drawWave()
 })
 watch(activeSeg, () => drawWave())
-watch(selectedVariant, () => {
-  if (activeSeg.value !== null) {
-    const data = mockCollate(activeSeg.value)
-    if (variantGraphSvg.value) drawVariantGraph(variantGraphSvg.value, data)
-  }
-})
 watch(
   () => settings.value.sortBy,
   (mode) => applySort(mode),
@@ -1056,13 +1016,40 @@ defineExpose({ segs, colOrder, tree })
 
 .vg-strip {
   border-top: 1px solid var(--border);
-  padding: 8px 12px;
+  padding: var(--padding);
   background: var(--bg);
 }
 
-.vg-strip-title {
+.vg-strip-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin-bottom: 6px;
+}
+
+.vg-strip-title {
   color: var(--ink);
+}
+
+.vg-strip-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--h-space);
+}
+
+.vg-strip-threshold {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--h-space) / 2);
+  font-family: var(--mono);
+  font-size: 0.8em;
+  color: var(--ink3);
+}
+
+.vg-strip-threshold input[type='range'] {
+  width: 80px;
+  height: 3px;
+  accent-color: var(--ink);
 }
 
 .vg-strip-scroll {
