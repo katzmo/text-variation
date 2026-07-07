@@ -1,11 +1,7 @@
 <template>
   <div>
-    <div class="collation-resize" v-if="!isFullscreen" @mousedown="startResize"></div>
-    <div
-      class="collation-panel"
-      :class="{ 'collation-panel-fullscreen': isFullscreen }"
-      :style="isFullscreen ? {} : { height: panelH + 'px' }"
-    >
+    <div class="collation-resize" @mousedown="startResize"></div>
+    <div class="collation-panel" :style="{ height: panelH + 'px' }">
       <!-- Header -->
       <div class="collation-header">
         <span class="collation-title">Collation view</span>
@@ -29,13 +25,6 @@
             v-model.number="zoom"
             style="width: 80px; height: 3px; accent-color: var(--ink)"
           />
-          <button
-            class="col-settings-btn"
-            @click="toggleFullscreen"
-            :title="isFullscreen ? 'Exit fullscreen' : 'Fullscreen'"
-          >
-            {{ isFullscreen ? '⤡' : '⤢' }}
-          </button>
           <button class="col-settings-btn" @click="showSettings = !showSettings" title="Settings">
             ⚙
           </button>
@@ -65,7 +54,7 @@
         <div class="col-minimap-vp" :style="minimapVP"></div>
       </div>
 
-      <div class="collation-body" ref="bodyEl">
+      <div class="collation-body">
         <!-- Dendro -->
         <div class="col-dendro-wrap">
           <svg ref="dendroSvg" style="display: block"></svg>
@@ -149,8 +138,7 @@
         <!-- Detail strip -->
         <div class="col-detail" v-if="activeSeg !== null">
           <div class="col-detail-toggle" @click="detOpen = !detOpen">{{ detOpen ? '▼' : '▲' }}</div>
-          <div v-if="detOpen" class="col-detail-resize" @mousedown="startDetResize"></div>
-          <div class="col-detail-body" v-if="detOpen" :style="{ maxHeight: detH + 'px' }">
+          <div class="col-detail-body" v-if="detOpen">
             <div class="col-detail-texts">
               <div class="col-detail-wit" v-for="(w, wi) in visibleCols" :key="w.id">
                 <div class="col-detail-badge" :class="badgeClass(wi, w.id)">{{ w.id }}</div>
@@ -223,7 +211,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import * as d3 from 'd3'
 import CollationSettings from './CollationSettings.vue'
 import GraphView from './GraphView.vue'
@@ -254,14 +242,12 @@ function getSegText(id, si) {
 
 // ── Local state ──────────────────────────────────────────────────────────────
 const panelH = ref(340)
-const isFullscreen = ref(false)
 const zoom = ref(58)
 const colOrder = ref([])
 const tree = ref(null)
 const segs = ref(Array.from({ length: 8 }, (_, i) => `seg-${String(i + 1).padStart(3, '0')}`))
 const activeSeg = ref(null)
 const detOpen = ref(true)
-const detH = ref(300)
 const dragId = ref(null)
 const dragOver = ref(null)
 const wavePath = ref(null)
@@ -281,7 +267,6 @@ const dendroSvg = ref(null)
 const scrollEl = ref(null)
 const rowEl = ref(null)
 const minimapEl = ref(null)
-const bodyEl = ref(null)
 
 // ── Graph view state ──────────────────────────────────────────────────────────
 const rawGraphResult = ref(null) // last fetched/mocked { table, witnesses } for the active segment
@@ -563,15 +548,6 @@ function mockCollate(si) {
   return { table, witnesses: tokens.map((t) => t.id) }
 }
 
-// ── Fullscreen ───────────────────────────────────────────────────────────────
-function toggleFullscreen() {
-  isFullscreen.value = !isFullscreen.value
-  setTimeout(drawDendro, 30)
-}
-function onKeydown(e) {
-  if (e.key === 'Escape' && isFullscreen.value) toggleFullscreen()
-}
-
 // ── Resize ───────────────────────────────────────────────────────────────────
 function startResize(e) {
   e.preventDefault()
@@ -584,24 +560,6 @@ function startResize(e) {
     window.removeEventListener('mousemove', onMove)
     window.removeEventListener('mouseup', onUp)
     drawDendro()
-  }
-  window.addEventListener('mousemove', onMove)
-  window.addEventListener('mouseup', onUp)
-}
-
-function startDetResize(e) {
-  e.preventDefault()
-  const startY = e.clientY
-  const startH = detH.value
-  // Leave room for the dendro/toggle strips and a minimum sliver of the columns view.
-  const bodyH = bodyEl.value ? bodyEl.value.clientHeight : 600
-  const maxH = Math.max(120, bodyH - 220)
-  const onMove = (ev) => {
-    detH.value = Math.max(120, Math.min(maxH, startH + (startY - ev.clientY)))
-  }
-  const onUp = () => {
-    window.removeEventListener('mousemove', onMove)
-    window.removeEventListener('mouseup', onUp)
   }
   window.addEventListener('mousemove', onMove)
   window.addEventListener('mouseup', onUp)
@@ -743,7 +701,6 @@ watch(
 
 // ── Mount ────────────────────────────────────────────────────────────────────
 onMounted(() => {
-  window.addEventListener('keydown', onKeydown)
   if (alignMatrix.value) return // matrix watcher will set up layout
   const ids = witnesses.value.map((w) => w.id)
   tree.value = upgma(ids, storeGetSegText)
@@ -751,7 +708,6 @@ onMounted(() => {
   colOrder.value = order.map((id) => witnesses.value.find((w) => w.id === id)).filter(Boolean)
   setTimeout(drawDendro, 50)
 })
-onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 
 // Expose so parent (App) can update segs after upload
 defineExpose({ segs, colOrder, tree })
@@ -786,13 +742,6 @@ defineExpose({ segs, colOrder, tree })
   flex-direction: column;
   position: relative;
   min-height: 180px;
-}
-.collation-panel-fullscreen {
-  position: fixed;
-  inset: 0;
-  height: 100vh;
-  z-index: 1000;
-  border-top: none;
 }
 .collation-header {
   display: flex;
@@ -1076,27 +1025,8 @@ defineExpose({ segs, colOrder, tree })
 .col-detail-toggle:hover {
   background: var(--bg-hover);
 }
-.col-detail-resize {
-  height: 6px;
-  background: var(--border);
-  cursor: ns-resize;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.1s;
-}
-.col-detail-resize:hover {
-  background: var(--border2);
-}
-.col-detail-resize::before {
-  content: '';
-  width: 24px;
-  height: 2px;
-  background: var(--ink3);
-  border-radius: 2px;
-}
 .col-detail-body {
+  max-height: 300px;
   overflow-y: auto;
 }
 .col-detail-texts {
