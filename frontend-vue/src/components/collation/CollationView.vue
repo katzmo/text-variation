@@ -181,7 +181,11 @@
                       max="1"
                       step="0.05"
                       v-model.number="graphThreshold"
-                      :title="'Readings at least ' + Math.round(graphThreshold * 100) + '% similar are merged'"
+                      :title="
+                        'Readings at least ' +
+                        Math.round(graphThreshold * 100) +
+                        '% similar are merged'
+                      "
                     />
                     <span>{{ graphThreshold.toFixed(2) }}</span>
                   </div>

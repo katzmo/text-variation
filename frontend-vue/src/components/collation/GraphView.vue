@@ -27,7 +27,7 @@ import * as d3 from 'd3'
 import { witnessColor } from '../../utils.js'
 
 const props = defineProps({
-  data: { type: Array, required: true },       // GraphPosition[]
+  data: { type: Array, required: true }, // GraphPosition[]
   translationOrder: { type: Array, required: true },
   hoveredTranslation: { type: String, default: null },
   selectedWitness: { type: String, default: null },
@@ -82,9 +82,7 @@ function resolveCollisions(nodes) {
       const a = nodes[i]
       const b = nodes[i + 1]
       const minGap =
-        getPillHeight(a.translations.length) / 2 +
-        getPillHeight(b.translations.length) / 2 +
-        24
+        getPillHeight(a.translations.length) / 2 + getPillHeight(b.translations.length) / 2 + 24
       const overlap = minGap - (b.y - a.y)
       if (overlap > 0) {
         a.y -= overlap / 2
@@ -122,8 +120,7 @@ function computeNodePositions(data, translationOrder) {
     const posNodes = pos.groups.map((group) => {
       const ys = group.translations.map(translationY).sort((a, b) => a - b)
       const mid = Math.floor(ys.length / 2)
-      const medianY =
-        ys.length % 2 !== 0 ? ys[mid] : (ys[mid - 1] + ys[mid]) / 2
+      const medianY = ys.length % 2 !== 0 ? ys[mid] : (ys[mid - 1] + ys[mid]) / 2
 
       const previousYs = group.translations
         .map((t) => previousTranslationY.get(t))
@@ -177,9 +174,7 @@ function computeNodePositions(data, translationOrder) {
 }
 
 function buildPaths(data, nodes, translationOrder, zoom) {
-  const verseTranslations = new Set(
-    data.flatMap((p) => p.groups.flatMap((g) => g.translations)),
-  )
+  const verseTranslations = new Set(data.flatMap((p) => p.groups.flatMap((g) => g.translations)))
   const sorted = translationOrder.filter((t) => verseTranslations.has(t))
 
   return sorted.map((translation) => {
@@ -255,9 +250,12 @@ function drawGraph() {
   props.data.forEach((_, pi) => {
     const x = xScale(pi.toString())
     g.append('line')
-      .attr('x1', x).attr('x2', x)
-      .attr('y1', 0).attr('y2', INNER_H)
-      .attr('stroke', '#ccc').attr('stroke-width', 1)
+      .attr('x1', x)
+      .attr('x2', x)
+      .attr('y1', 0)
+      .attr('y2', INNER_H)
+      .attr('stroke', '#ccc')
+      .attr('stroke-width', 1)
   })
 
   // ── Nodes (pills) ─────────────────────────────────────────────────────────
@@ -273,16 +271,20 @@ function drawGraph() {
       const isEmpty = node.word === '-'
 
       g.append('rect')
-        .attr('x', pillX).attr('y', pillY)
-        .attr('width', PILL_WIDTH).attr('height', pillHeight)
-        .attr('rx', radius).attr('ry', radius)
+        .attr('x', pillX)
+        .attr('y', pillY)
+        .attr('width', PILL_WIDTH)
+        .attr('height', pillHeight)
+        .attr('rx', radius)
+        .attr('ry', radius)
         .attr('fill', '#e8e8e8')
         .attr('stroke', '#ccc')
         .attr('stroke-width', 1)
         .attr('opacity', isEmpty ? 0.5 : 1.0)
 
       g.append('text')
-        .attr('x', node.x).attr('y', pillY - 6)
+        .attr('x', node.x)
+        .attr('y', pillY - 6)
         .attr('text-anchor', 'middle')
         .attr('font-size', '11px')
         .attr('fill', '#444')
@@ -299,8 +301,12 @@ function applyHighlight() {
   const translation = props.hoveredTranslation || props.selectedWitness
   const edgeGroup = d3.select(svgRef.value).select('.edges')
   if (translation) {
-    edgeGroup.selectAll('path').attr('stroke-opacity', 0.30).attr('stroke-width', 4)
-    edgeGroup.select(`.path-${CSS.escape(translation)}`).attr('stroke-opacity', 1).attr('stroke-width', 4).raise()
+    edgeGroup.selectAll('path').attr('stroke-opacity', 0.3).attr('stroke-width', 4)
+    edgeGroup
+      .select(`.path-${CSS.escape(translation)}`)
+      .attr('stroke-opacity', 1)
+      .attr('stroke-width', 4)
+      .raise()
   } else {
     edgeGroup.selectAll('path').attr('stroke-opacity', 0.35).attr('stroke-width', 4)
   }
