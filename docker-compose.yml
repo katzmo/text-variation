@@ -14,7 +14,6 @@ services:
 
   frontend:
     build:
-      target: build
       context: ./frontend-vue
     container_name: kat-frontend
     ports:
