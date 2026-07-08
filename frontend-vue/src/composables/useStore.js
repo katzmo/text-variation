@@ -37,6 +37,13 @@ function getAlignScore(id, si) {
   return cell ? cell.score : 0 // 0 = gap (no aligned line here)
 }
 
+// Stable segment ID for a cell, matching the backend's "{witness_id}:{anchor_pos}" scheme.
+function getSegId(id, si) {
+  const m = alignMatrix.value
+  const cell = m && m.cells[id] ? m.cells[id][si] : null
+  return cell && cell.seg_id ? cell.seg_id : `${id}:${si}`
+}
+
 const filteredWitnesses = computed(() => {
   const q = witSearch.value.toLowerCase()
   if (!q) return witnesses.value
@@ -57,5 +64,6 @@ export function useStore() {
     alignMatrix,
     getSegText,
     getAlignScore,
+    getSegId,
   }
 }

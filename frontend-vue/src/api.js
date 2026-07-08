@@ -55,11 +55,11 @@ export async function fetchAlignWitnesses() {
   return r.json()
 }
 
-export async function postRunAlignment(anchorId, threshold, topK = 15) {
+export async function postRunAlignment(anchorId, threshold, topK = 15, tags = '') {
   const r = await fetch(`${API}/align/run`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ anchor_id: anchorId, threshold, top_k: topK }),
+    body: JSON.stringify({ anchor_id: anchorId, threshold, top_k: topK, tags }),
   })
   if (!r.ok) throw new Error('Alignment failed')
   return r.json()
@@ -80,5 +80,11 @@ export async function postSaveAlignment() {
 export async function fetchAlignMatrix(maxRows = 0) {
   const r = await fetch(`${API}/align/matrix?max_rows=${maxRows}`)
   if (!r.ok) throw new Error('Matrix fetch failed')
+  return r.json()
+}
+
+export async function fetchSegPairScore(segA, segB) {
+  const r = await fetch(`${API}/align/score?seg_a=${encodeURIComponent(segA)}&seg_b=${encodeURIComponent(segB)}`)
+  if (!r.ok) throw new Error('Score fetch failed')
   return r.json()
 }
