@@ -353,6 +353,9 @@ async def confirm_upload(req: ConfirmRequest):
     if req.replace:
         for f in DATA_DIR.glob("*.xml"): f.unlink()
         for f in DATA_DIR.glob("*.txt"): f.unlink()
+        # Wipe every stored score — the whole witness set is being replaced, so
+        # all old seg_id keys are meaningless now.
+        _scores_db.clear_all()
 
     meta = {}
     # Load existing metadata if not replacing
@@ -370,6 +373,11 @@ async def confirm_upload(req: ConfirmRequest):
         safe_id = "".join(c for c in w.id if c.isalnum() or c in "-_") or w.filename
         dst = DATA_DIR / f"{safe_id}{ext}"
         shutil.copy2(src, dst)
+        # A re-uploaded (or edited) witness must not keep scores from its previous
+        # content: the same seg_id can now point at different text. Drop this
+        # witness's stored pairs so nothing stale survives under identical keys.
+        if not req.replace:
+            _scores_db.delete_witness(safe_id)
         meta[w.id] = {
             "name":        w.name,
             "year":        w.year,
@@ -379,6 +387,13 @@ async def confirm_upload(req: ConfirmRequest):
             "lat":         w.lat,
             "lng":         w.lng,
         }
+
+    _scores_db.commit()
+    # The witness set changed, so the current alignment (segment positions,
+    # relations, matrix) is stale. Forget it and its saved state; the user re-runs
+    # alignment, and startup won't replay a run against a changed corpus.
+    _reset_alignment_memory()
+    _clear_align_state()
 
     meta_path.write_text(json.dumps(meta, indent=2))
     return {"status": "ok", "witnesses": req.witnesses}
@@ -401,8 +416,49 @@ _ALIGN_ANCHOR: dict = {"id": None, "unit": "", "tags": []}
 # the file changed or a different set of segmentation tags is requested.
 _LINES_CACHE: dict = {}
 
+# All-pairs relation graph (#2), rebuilt on every alignment run.
+#   _SEGMENTS[seg_id]  = {"wid", "pos", "n", "text"}   — every segment, all witnesses
+#   _RELATIONS[seg_id] = [(other_seg_id, score), ...]  — cross-witness edges
+_SEGMENTS: dict = {}
+_RELATIONS: dict = {}
+# Low keep-all threshold for FINDING relations. Not a display filter: callers
+# filter by score at read time (#7). align-lab's default is 0.1.
+REL_THRESHOLD = 0.1
+
 from . import align_segments as _align
 from .lab_similarity import Bundle, hybrid_score
+
+
+def _make_seg_id(wid: str, unit: str, pos: int) -> str:
+    """Intrinsic seg_id: "{wid}:{unit}:{pos}" with a segmentation unit, else
+    "{wid}:{pos}". Single source of the scheme shared by the matrix, the relation
+    graph, and the data-ids injected into served XML."""
+    return f"{wid}:{unit}:{pos}" if unit else f"{wid}:{pos}"
+
+
+# Sidecar holding the last alignment run's parameters. The alignment itself is
+# reproducible from these + the witness files + the code, so on restart we replay
+# the run instead of serializing the whole graph (which would risk going stale).
+_ALIGN_STATE_PATH = DATA_DIR / "_align_state.json"
+
+
+def _save_align_state(anchor_id: str, threshold: float, top_k: int, tag_list: list):
+    _ALIGN_STATE_PATH.write_text(json.dumps({
+        "anchor_id": anchor_id, "threshold": threshold,
+        "top_k": top_k, "tags": tag_list,
+    }))
+
+
+def _clear_align_state():
+    _ALIGN_STATE_PATH.unlink(missing_ok=True)
+
+
+def _reset_alignment_memory():
+    """Forget the current in-memory alignment (segments moved / files changed)."""
+    _ALIGN_CACHE.clear()
+    _SEGMENTS.clear()
+    _RELATIONS.clear()
+    _ALIGN_ANCHOR.update({"id": None, "unit": "", "tags": []})
 
 
 def _load_lines_cached(path: Path, tags: list = None) -> list:
@@ -449,32 +505,46 @@ class AlignRunRequest(BaseModel):
 
 @app.post("/api/align/run")
 def align_run(req: AlignRunRequest):
-    """Run alignment of every witness against the chosen anchor."""
-    anchor_path = DATA_DIR / f"{req.anchor_id}.xml"
-    if not anchor_path.exists():
-        raise HTTPException(404, f"Anchor {req.anchor_id} not found")
-
-    # Segmentation tags: "p,lg" -> ['p','lg']; empty -> None (default line-level).
+    """Run alignment of every witness against the chosen anchor, plus the all-pairs
+    relation graph. Persists the run parameters so the alignment is restored after
+    a restart (see _restore_last_alignment)."""
+    # Segmentation tags: "p,lg" -> ['p','lg']; empty -> [] (default line-level).
     tag_list = [t.strip() for t in req.tags.split(",") if t.strip()]
+    result = _run_alignment(req.anchor_id, req.threshold, req.top_k, tag_list)
+    _save_align_state(req.anchor_id, req.threshold, req.top_k, tag_list)
+    return result
+
+
+def _run_alignment(anchor_id: str, threshold: float, top_k: int, tag_list: list) -> dict:
+    """Core alignment: anchor pass (for the matrix view) + all-pairs relations.
+    Shared by the /api/align/run endpoint and startup restore, so a replay
+    reproduces the exact same in-memory state."""
+    anchor_path = DATA_DIR / f"{anchor_id}.xml"
+    if not anchor_path.exists():
+        raise HTTPException(404, f"Anchor {anchor_id} not found")
+
     unit = "-".join(tag_list)  # "" keeps the original "{wid}:{pos}" seg_id scheme
 
     anchor_lines = _load_lines_cached(anchor_path, tags=tag_list)
     if not anchor_lines:
-        raise HTTPException(400, f"Anchor {req.anchor_id} has no readable segments")
+        raise HTTPException(400, f"Anchor {anchor_id} has no readable segments")
     anchor_idx = _align.build_index(anchor_lines)
     anchor_sets = [Bundle(t) for (_n, t) in anchor_lines]  # built once, reused
 
     _ALIGN_CACHE.clear()
-    _ALIGN_ANCHOR["id"] = req.anchor_id
+    _ALIGN_ANCHOR["id"] = anchor_id
     _ALIGN_ANCHOR["unit"] = unit
     _ALIGN_ANCHOR["tags"] = tag_list
     witnesses_stats = {}
+    loaded_segments: dict = {}  # wid -> [(n, text), ...] in intrinsic pos order
 
     for f in sorted(DATA_DIR.glob("*.xml")):
         if f.stem.startswith("_"):
             continue
         wid = f.stem
-        if wid == req.anchor_id:
+        lines = _load_lines_cached(f, tags=tag_list)
+        loaded_segments[wid] = lines
+        if wid == anchor_id:
             # The anchor aligns perfectly to itself
             alignment = [
                 {"witness_n": n, "witness_pos": i, "anchor_n": n, "anchor_pos": i,
@@ -482,20 +552,53 @@ def align_run(req: AlignRunRequest):
                 for i, (n, t) in enumerate(anchor_lines)
             ]
         else:
-            lines = _load_lines_cached(f, tags=tag_list)
             alignment = _align.align_witness(
                 lines, anchor_lines, anchor_idx,
-                threshold=req.threshold, top_k=req.top_k,
+                threshold=threshold, top_k=top_k,
                 anchor_sets=anchor_sets,
             )
         _ALIGN_CACHE[wid] = alignment
-        witnesses_stats[wid] = _align.alignment_stats(alignment, req.threshold)
+        witnesses_stats[wid] = _align.alignment_stats(alignment, threshold)
+
+    # #2 — all-pairs cross-witness relations, independent of the anchor.
+    n_edges = _build_relation_graph(loaded_segments, unit, top_k)
 
     return {
-        "anchor_id": req.anchor_id,
-        "threshold": req.threshold,
+        "anchor_id": anchor_id,
+        "threshold": threshold,
         "witnesses": witnesses_stats,
+        "relations": n_edges,
     }
+
+
+def _build_relation_graph(loaded_segments: dict, unit: str, top_k: int) -> int:
+    """Build and persist the all-pairs relation graph (#2) for the given loaded
+    witness segments. Rebuilds _SEGMENTS / _RELATIONS and upserts each edge's
+    hybrid-Levenshtein score into the scores DB. Returns the edge count.
+
+    Relations are found by Dice (keep-all at REL_THRESHOLD, transposition-tolerant
+    one-to-one per pair); the stored/edge score is hybrid-Levenshtein, matching
+    the pairwise score the matrix already uses so both views agree."""
+    _SEGMENTS.clear()
+    _RELATIONS.clear()
+
+    bundles: dict = {}  # seg_id -> Bundle, memoised for hybrid scoring
+    for wid, lines in loaded_segments.items():
+        for pos, (n, text) in enumerate(lines):
+            sid = _make_seg_id(wid, unit, pos)
+            _SEGMENTS[sid] = {"wid": wid, "pos": pos, "n": n, "text": text}
+            bundles[sid] = Bundle(text)
+
+    edges = _align.build_relations(loaded_segments, threshold=REL_THRESHOLD, top_k=top_k)
+    for wid_a, pos_a, wid_b, pos_b, _dice in edges:
+        sa = _make_seg_id(wid_a, unit, pos_a)
+        sb = _make_seg_id(wid_b, unit, pos_b)
+        score = round(hybrid_score(bundles[sa], bundles[sb]), 4)
+        _scores_db.upsert_score(sa, sb, score)
+        _RELATIONS.setdefault(sa, []).append((sb, score))
+        _RELATIONS.setdefault(sb, []).append((sa, score))
+    _scores_db.commit()
+    return len(edges)
 
 
 @app.get("/api/align/inspect/{witness_id}")
@@ -600,12 +703,44 @@ def align_matrix(max_rows: int = 0):
 @app.get("/api/align/score")
 def align_score(seg_a: str, seg_b: str):
     """Look up the stored hybrid-Levenshtein score for a pair of segment IDs
-    (scheme: "{witness_id}:{anchor_pos}", or "{witness_id}:{unit}:{anchor_pos}"
-    when a segmentation unit was used), as computed by /api/align/matrix."""
+    (intrinsic scheme: "{witness_id}:{pos}", or "{witness_id}:{unit}:{pos}" when a
+    segmentation unit was used), as computed by the alignment run / matrix."""
     score = _scores_db.get_score(seg_a, seg_b)
     if score is None:
         raise HTTPException(404, "No stored score for this segment pair.")
     return {"seg_a": seg_a, "seg_b": seg_b, "score": score}
+
+
+@app.get("/api/align/related")
+def align_related(seg_id: str, min_score: float = 0.0):
+    """Related segments in OTHER witnesses for a given segment, from the all-pairs
+    relation graph (#2). Returns them sorted by score (highest first), optionally
+    filtered to score >= min_score (a display filter, #7 — the graph itself keeps
+    everything). Requires a prior /api/align/run."""
+    if not _SEGMENTS:
+        raise HTTPException(400, "No relations available. Run alignment first.")
+    seg = _SEGMENTS.get(seg_id)
+    if seg is None:
+        raise HTTPException(404, f"Unknown segment {seg_id}.")
+    related = []
+    for other_id, score in sorted(_RELATIONS.get(seg_id, []), key=lambda x: -x[1]):
+        if score < min_score:
+            continue
+        other = _SEGMENTS.get(other_id, {})
+        related.append({
+            "seg_id":  other_id,
+            "witness": other.get("wid"),
+            "n":       other.get("n"),
+            "text":    other.get("text"),
+            "score":   score,
+        })
+    return {
+        "seg_id":  seg_id,
+        "witness": seg["wid"],
+        "n":       seg["n"],
+        "text":    seg["text"],
+        "related": related,
+    }
 
 
 @app.post("/api/align/save")
@@ -627,4 +762,25 @@ def align_save():
         except Exception:
             pass
     return {"status": "ok", "count": count, "dir": str(out_dir)}
+
+
+# ── Restore last alignment on startup ──────────────────────────────
+def _restore_last_alignment():
+    """Replay the last alignment run (parameters saved in _align_state.json) so
+    the in-memory alignment — segments, relations, matrix — is back after a
+    restart, and the persisted scores are addressable rather than orphaned.
+    Best-effort: skipped silently if there's no saved run or the anchor is gone."""
+    if not _ALIGN_STATE_PATH.exists():
+        return
+    try:
+        st = json.loads(_ALIGN_STATE_PATH.read_text())
+        if not (DATA_DIR / f"{st['anchor_id']}.xml").exists():
+            return
+        _run_alignment(st["anchor_id"], st.get("threshold", 0.35),
+                       st.get("top_k", 15), st.get("tags", []))
+    except Exception:
+        pass
+
+
+_restore_last_alignment()
 

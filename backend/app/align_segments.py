@@ -445,6 +445,72 @@ def align_witness(
     return result
 
 
+# ── All-pairs cross-witness alignment (#2) ─────────────────────────────────────
+
+def _pair_edges(bundles_a: list, bundles_b: list, index_b: dict,
+                threshold: float, top_k: int, min_word_len: int) -> list:
+    """Greedy one-to-one best matches from witness A's segments to witness B's.
+    Returns [(pos_a, pos_b, dice_score), ...].
+
+    Transposition-tolerant: unlike lis_alignment there is NO monotonicity
+    requirement. Each A-segment shortlists candidate B-positions via B's inverted
+    index, scores them with Dice, and the highest-scoring pairs are assigned
+    first, each segment used at most once. Mirrors align-lab's updated
+    two_pass_lis greedy assignment, so a segment that is similar but out of order
+    still gets related to its twin instead of being dropped."""
+    raw = []
+    for pa, ba in enumerate(bundles_a):
+        cands: dict = {}
+        for w in ba.wset:
+            if len(w) > min_word_len:
+                for pb in index_b.get(w, ()):
+                    cands[pb] = cands.get(pb, 0) + 1
+        if not cands:
+            continue
+        top = sorted(cands.items(), key=lambda x: -x[1])[:top_k]
+        for pb, _ in top:
+            s = sim_dice(ba, bundles_b[pb])
+            if s >= threshold:
+                raw.append((pa, pb, s))
+    raw.sort(key=lambda x: -x[2])
+    used_a, used_b = set(), set()
+    edges = []
+    for pa, pb, s in raw:
+        if pa in used_a or pb in used_b:
+            continue
+        used_a.add(pa)
+        used_b.add(pb)
+        edges.append((pa, pb, round(s, 4)))
+    return edges
+
+
+def build_relations(witness_segments: dict, threshold: float = 0.1,
+                    top_k: int = 15, min_word_len: int = 3) -> list:
+    """All-pairs cross-witness alignment (#2).
+
+    witness_segments: {witness_id: [(local_n, clean_text), ...]} in intrinsic
+    position order (i.e. load_witness output per witness).
+
+    Returns edges [(wid_a, pos_a, wid_b, pos_b, dice_score), ...] for every
+    unordered witness pair (wid_a < wid_b), keeping every segment. There is no
+    single anchor: witnesses are related directly to each other, and the greedy
+    one-to-one matching per pair tolerates transposition. `threshold` is kept low
+    so few real relations are lost — filtering by score is a display concern (#7),
+    not something baked into the graph."""
+    wids = sorted(witness_segments)
+    bundles = {w: [Bundle(t) for (_n, t) in witness_segments[w]] for w in wids}
+    indices = {w: build_index(witness_segments[w], min_word_len) for w in wids}
+
+    edges = []
+    for i in range(len(wids)):
+        for j in range(i + 1, len(wids)):
+            wa, wb = wids[i], wids[j]
+            for pa, pb, s in _pair_edges(bundles[wa], bundles[wb], indices[wb],
+                                         threshold, top_k, min_word_len):
+                edges.append((wa, pa, wb, pb, s))
+    return edges
+
+
 def alignment_stats(alignment: list, threshold: float) -> dict:
     total = len(alignment)
     aligned = [a for a in alignment if a["anchor_n"] is not None]

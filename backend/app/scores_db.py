@@ -47,3 +47,19 @@ def get_score(seg_a: str, seg_b: str):
         "SELECT score FROM pair_scores WHERE seg_a = ? AND seg_b = ?", (a, b)
     ).fetchone()
     return row[0] if row else None
+
+
+def delete_witness(wid: str):
+    """Remove every stored pair that references a segment of this witness, so a
+    re-uploaded file doesn't leave misleading scores under identical seg_id keys.
+    seg_ids follow "{wid}:..." — matched with GLOB, whose only metacharacters
+    (* ? [) never occur in a witness id (alphanumeric / - / _)."""
+    pat = f"{wid}:*"
+    _conn.execute(
+        "DELETE FROM pair_scores WHERE seg_a GLOB ? OR seg_b GLOB ?", (pat, pat)
+    )
+
+
+def clear_all():
+    """Drop all stored scores (used when an upload replaces the whole witness set)."""
+    _conn.execute("DELETE FROM pair_scores")
