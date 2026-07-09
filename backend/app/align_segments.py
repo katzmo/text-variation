@@ -85,13 +85,13 @@ def _strip_ns(tag) -> str:
     return tag
 
 
-def load_witness_lb(tree) -> list:
-    """
-    Load lines from a milestone-style TEI where <lb n="N"/> marks line beginnings
-    and the line text is the tail content following each <lb/> up to the next one.
-    Returns list of (local_n: int, clean_text: str).
-    """
-    lines = []
+def _collect_lb_pairs(tree) -> list:
+    """Walk a milestone-style TEI where <lb n="N"/> marks line beginnings and the
+    line text is the tail/following content up to the next <lb/>. Returns the
+    kept segments as (lb_element, clean_text) pairs — only <lb/>s that carry a
+    numeric `n` and non-empty text, matching load_witness_lb's filtering exactly.
+    Both the loader and the XML annotator build on this so they never diverge."""
+    pairs = []
     # Find all lb elements in document order, namespace-agnostic
     lbs = [el for el in tree.iter() if _strip_ns(el.tag) == 'lb']
     for i, lb in enumerate(lbs):
@@ -103,7 +103,6 @@ def load_witness_lb(tree) -> list:
         parts = [lb.tail or '']
         # Walk subsequent nodes in document order until we hit the next lb
         nxt = lbs[i + 1] if i + 1 < len(lbs) else None
-        node = lb
         # Use iter over the whole tree is expensive; instead walk siblings/parents
         for el in lb.itersiblings():
             if el is nxt:
@@ -116,12 +115,22 @@ def load_witness_lb(tree) -> list:
             if nxt is not None and _contains(el, nxt):
                 break
         text = _clean_text_string(''.join(parts))
-        if text:
-            try:
-                lines.append((int(n), text))
-            except ValueError:
-                pass
-    return lines
+        if not text:
+            continue
+        try:
+            int(n)
+        except ValueError:
+            continue
+        pairs.append((lb, text))
+    return pairs
+
+
+def load_witness_lb(tree) -> list:
+    """
+    Load lines from a milestone-style TEI where <lb n="N"/> marks line beginnings.
+    Returns list of (local_n: int, clean_text: str).
+    """
+    return [(int(lb.get('n')), text) for lb, text in _collect_lb_pairs(tree)]
 
 
 def _element_text_until(el, stop) -> str:
@@ -184,31 +193,6 @@ def _has_body(tree) -> bool:
     return any(_strip_ns(e.tag) == 'body' for e in tree.iter())
 
 
-def load_witness_tags(tree, tags: list) -> list:
-    """
-    Segment a witness by arbitrary TEI tags (e.g. ['p', 'lg']) instead of lines.
-    Ports align-lab parsers.load_segments: collect every element whose local name
-    is one of `tags` (preferring those inside <body>), in document order; each
-    becomes one segment. Falls back to <lb/> milestones if 'lb' is requested and
-    nothing else matched. Returns list of (seq_index, clean_text).
-    """
-    elements = _xpath_tags(tree, tags, within_body=True)
-    if not elements and not _has_body(tree):
-        # Only when the file has no <body> at all: retry over the whole tree so a
-        # tag the user typed still segments. (When a <body> exists we stay scoped
-        # to it, like align-lab's CLI, to avoid grabbing teiHeader content.)
-        elements = _xpath_tags(tree, tags, within_body=False)
-
-    segments = []
-    for el in elements:
-        text = _clean_text_string(_tag_element_text(el))
-        if text:
-            segments.append((len(segments) + 1, text))
-    if not segments and 'lb' in tags:
-        segments = load_witness_lb(tree)
-    return segments
-
-
 _FAUST_NS = "http://www.faustedition.net/ns"
 
 
@@ -223,44 +207,103 @@ def _line_number(el, fallback: int) -> int:
     return fallback
 
 
-def load_witness(path: Path, tags: Optional[list] = None) -> list:
+def collect_segments(tree, tags: Optional[list] = None):
     """
-    Return list of (local_n: int, clean_text: str).
+    Return (dialect, [(element, clean_text), ...]) — the segment elements of a
+    witness, in document order, using the exact same cascade and filtering as the
+    aligner. Both load_witness (numbering / alignment) and annotate_witness_xml
+    (id injection into served XML) build on this single source of truth, so the
+    intrinsic seg_id of a segment is the same string in both places.
+
+    Dialect is one of "tags" / "l" / "line" / "lb". Empty-text entries may be
+    present for the "tags"/"l"/"line" dialects; callers number only the non-empty
+    ones. The "lb" dialect is pre-filtered (numeric n + non-empty text).
 
     If `tags` is given (e.g. ['p', 'lg']), segment by those TEI tags instead of
-    lines — this is the "tags to use as segments" option, mirroring align-lab's
-    --tags CLI. Otherwise fall back to the default line-level cascade over three
-    TEI dialects, tried in turn (first that yields lines wins):
+    lines — the "tags to use as segments" option mirroring align-lab's --tags CLI.
+    Otherwise cascade over three TEI dialects (first that yields text wins):
       <l>    container / verse lines (incl. Faust <l f:nx="t3_N">)
       <line> diplomatic page lines (Faust page transcripts)
       <lb/>  milestone markers (Armenian Matenadaran corpus)
     """
-    tree = etree.parse(str(path))
-
     if tags:
-        return load_witness_tags(tree, tags)
+        elements = _xpath_tags(tree, tags, within_body=True)
+        if not elements and not _has_body(tree):
+            # Only when the file has no <body> at all: retry over the whole tree so
+            # a tag the user typed still segments. (When a <body> exists we stay
+            # scoped to it, like align-lab's CLI, to avoid grabbing teiHeader text.)
+            elements = _xpath_tags(tree, tags, within_body=False)
+        pairs = [(el, _clean_text_string(_tag_element_text(el))) for el in elements]
+        if any(t for _el, t in pairs):
+            return "tags", pairs
+        if 'lb' in tags:
+            return "lb", _collect_lb_pairs(tree)
+        return "tags", pairs
 
+    l_pairs = [(el, clean_line_text(el)) for el in tree.iter() if _strip_ns(el.tag) == 'l']
+    if any(t for _el, t in l_pairs):
+        return "l", l_pairs
+    line_pairs = [(el, clean_line_text(el)) for el in tree.iter() if _strip_ns(el.tag) == 'line']
+    if any(t for _el, t in line_pairs):
+        return "line", line_pairs
+    return "lb", _collect_lb_pairs(tree)
+
+
+def _lines_from_segments(dialect: str, pairs: list) -> list:
+    """Turn collect_segments output into the (local_n, clean_text) list, skipping
+    empty segments. The 0-based position within this filtered list is a segment's
+    intrinsic id position; local_n is only a display label (dialect-specific)."""
     lines = []
-
-    # 1. <l> container / verse lines (namespace-agnostic)
-    for el in (e for e in tree.iter() if _strip_ns(e.tag) == 'l'):
-        text = clean_line_text(el)
-        if text:
-            lines.append((_line_number(el, len(lines) + 1), text))
-
-    # 2. <line> diplomatic page lines (Faust page files)
-    if not lines:
-        line_els = (e for e in tree.iter() if _strip_ns(e.tag) == 'line')
-        for i, el in enumerate(line_els, start=1):
-            text = clean_line_text(el)
-            if text:
-                lines.append((i, text))
-
-    # 3. <lb/> milestone style (Armenian; tail text follows each marker)
-    if not lines:
-        lines = load_witness_lb(tree)
-
+    for el, text in pairs:
+        if not text:
+            continue
+        if dialect == "l":
+            n = _line_number(el, len(lines) + 1)
+        elif dialect == "lb":
+            n = int(el.get('n'))
+        else:  # "line" / "tags": sequential
+            n = len(lines) + 1
+        lines.append((n, text))
     return lines
+
+
+def load_witness_tags(tree, tags: list) -> list:
+    """Segment a witness by TEI tags (e.g. ['p', 'lg']). Kept for compatibility;
+    delegates to collect_segments. Returns list of (seq_index, clean_text)."""
+    return _lines_from_segments(*collect_segments(tree, tags))
+
+
+def load_witness(path: Path, tags: Optional[list] = None) -> list:
+    """Return list of (local_n: int, clean_text: str) for a witness file."""
+    tree = etree.parse(str(path))
+    return _lines_from_segments(*collect_segments(tree, tags))
+
+
+def _seg_id(witness_id: str, unit: str, pos: int) -> str:
+    """Intrinsic segment id: "{wid}:{unit}:{pos}" when a segmentation unit is set,
+    else "{wid}:{pos}". `pos` is the segment's 0-based position in its own text.
+    Mirrors the scheme in main.align_matrix so DOM data-ids match the score keys."""
+    return f"{witness_id}:{unit}:{pos}" if unit else f"{witness_id}:{pos}"
+
+
+def annotate_witness_xml(path: Path, witness_id: str,
+                         tags: Optional[list] = None, unit: str = "") -> str:
+    """Parse a witness TEI file and inject a `data-id` attribute onto every
+    segment element, carrying that segment's intrinsic seg_id. Returns the
+    serialized XML as a string. `tags`/`unit` should match the alignment run so
+    the injected ids line up with the stored pairwise scores.
+
+    `data-id` (a plain, unnamespaced attribute) is used rather than xml:id because
+    seg_ids contain ':' and are not valid XML NCNames."""
+    tree = etree.parse(str(path))
+    dialect, pairs = collect_segments(tree, tags)
+    pos = 0
+    for el, text in pairs:
+        if not text:
+            continue
+        el.set("data-id", _seg_id(witness_id, unit, pos))
+        pos += 1
+    return etree.tostring(tree, encoding="unicode")
 
 
 # ── Similarity ────────────────────────────────────────────────────────────────
@@ -382,6 +425,7 @@ def align_witness(
             an, at = anchor_lines[ap]
             result.append({
                 "witness_n":   wn,
+                "witness_pos": wi,
                 "anchor_n":    an,
                 "anchor_pos":  ap,
                 "score":       round(sc, 4),
@@ -391,6 +435,7 @@ def align_witness(
         else:
             result.append({
                 "witness_n":   wn,
+                "witness_pos": wi,
                 "anchor_n":    None,
                 "anchor_pos":  None,
                 "score":       0.0,

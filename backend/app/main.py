@@ -130,11 +130,24 @@ def get_witnesses():
 
 @app.get("/api/witnesses/{witness_id}/xml")
 def get_witness_xml(witness_id: str):
-    for ext in (".xml", ".txt"):
-        path = DATA_DIR / f"{witness_id}{ext}"
-        if path.exists():
-            mt = "application/xml" if ext == ".xml" else "text/plain"
-            return Response(content=path.read_text(), media_type=mt)
+    """Serve a witness's TEI with a `data-id` on every segment element, so the
+    frontend can render the full text in original order and address each segment
+    (to show its aligned partners and scores). The ids use the same intrinsic
+    scheme and segmentation (tags/unit) as the most recent alignment run, so they
+    match the score keys. Falls back to the raw file if annotation fails; .txt
+    files (non-XML) are served as-is."""
+    xml_path = DATA_DIR / f"{witness_id}.xml"
+    if xml_path.exists():
+        tags = _ALIGN_ANCHOR.get("tags") or None
+        unit = _ALIGN_ANCHOR.get("unit") or ""
+        try:
+            content = _align.annotate_witness_xml(xml_path, witness_id, tags=tags, unit=unit)
+        except Exception:
+            content = xml_path.read_text()
+        return Response(content=content, media_type="application/xml")
+    txt_path = DATA_DIR / f"{witness_id}.txt"
+    if txt_path.exists():
+        return Response(content=txt_path.read_text(), media_type="text/plain")
     raise HTTPException(404, f"Witness {witness_id} not found")
 
 @app.get("/api/segments")
@@ -381,7 +394,7 @@ def health():
 _ALIGN_CACHE: dict = {}
 # "unit" is the segmentation label of the last run (from the --tags option, e.g.
 # "p-lg"); "" means default line-level. It feeds the seg_id scheme below.
-_ALIGN_ANCHOR: dict = {"id": None, "unit": ""}
+_ALIGN_ANCHOR: dict = {"id": None, "unit": "", "tags": []}
 
 # Cache of parsed witness lines so each file is read from disk only once.
 # Keyed by (witness id, tags tuple); value is (mtime, lines). Re-parses only if
@@ -454,6 +467,7 @@ def align_run(req: AlignRunRequest):
     _ALIGN_CACHE.clear()
     _ALIGN_ANCHOR["id"] = req.anchor_id
     _ALIGN_ANCHOR["unit"] = unit
+    _ALIGN_ANCHOR["tags"] = tag_list
     witnesses_stats = {}
 
     for f in sorted(DATA_DIR.glob("*.xml")):
@@ -463,7 +477,7 @@ def align_run(req: AlignRunRequest):
         if wid == req.anchor_id:
             # The anchor aligns perfectly to itself
             alignment = [
-                {"witness_n": n, "anchor_n": n, "anchor_pos": i,
+                {"witness_n": n, "witness_pos": i, "anchor_n": n, "anchor_pos": i,
                  "score": 1.0, "text": t, "anchor_text": t}
                 for i, (n, t) in enumerate(anchor_lines)
             ]
@@ -533,8 +547,11 @@ def align_matrix(max_rows: int = 0):
         anchor_lines = anchor_lines[:n_rows]
 
     # seg_id scheme: "{wid}:{unit}:{pos}" when a segmentation unit is set (e.g.
-    # "p-lg"), else the original "{wid}:{pos}". Same string in the DOM data-id,
-    # the score keys, and the API — an opaque, deterministic document-order id.
+    # "p-lg"), else "{wid}:{pos}". `pos` is the segment's INTRINSIC position in
+    # its own text (0-based document order), not the anchor row it landed on — so
+    # a segment keeps the same id whatever it aligns to, and whichever anchor is
+    # chosen. Same string in the DOM data-id, the score keys, and the API — an
+    # opaque, deterministic document-order id.
     unit = _ALIGN_ANCHOR.get("unit") or ""
 
     def _seg_id(wid: str, pos: int) -> str:
@@ -556,7 +573,7 @@ def align_matrix(max_rows: int = 0):
                     prev = row[pos]
                     if prev is None or a["score"] > prev["score"]:
                         row[pos] = {"score": a["score"], "text": a["text"],
-                                    "seg_id": _seg_id(wid, pos)}
+                                    "seg_id": _seg_id(wid, a["witness_pos"])}
         cells[wid] = row
 
     # Hybrid-Levenshtein pairwise scoring: for every anchor row, score every
