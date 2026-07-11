@@ -287,21 +287,31 @@ def _seg_id(witness_id: str, unit: str, pos: int) -> str:
 
 
 def annotate_witness_xml(path: Path, witness_id: str,
-                         tags: Optional[list] = None, unit: str = "") -> str:
+                         tags: Optional[list] = None, unit: str = "",
+                         groups: Optional[dict] = None) -> str:
     """Parse a witness TEI file and inject a `data-id` attribute onto every
     segment element, carrying that segment's intrinsic seg_id. Returns the
     serialized XML as a string. `tags`/`unit` should match the alignment run so
     the injected ids line up with the stored pairwise scores.
 
-    `data-id` (a plain, unnamespaced attribute) is used rather than xml:id because
-    seg_ids contain ':' and are not valid XML NCNames."""
+    If `groups` (a seg_id -> group_id map, #9) is given, each segment that belongs
+    to a shared "reading" group also gets a `data-group` attribute, so the frontend
+    can highlight the whole reading across all texts when one member is clicked.
+
+    `data-id`/`data-group` (plain, unnamespaced attributes) are used rather than
+    xml:id because seg_ids contain ':' and are not valid XML NCNames."""
     tree = etree.parse(str(path))
     dialect, pairs = collect_segments(tree, tags)
     pos = 0
     for el, text in pairs:
         if not text:
             continue
-        el.set("data-id", _seg_id(witness_id, unit, pos))
+        sid = _seg_id(witness_id, unit, pos)
+        el.set("data-id", sid)
+        if groups:
+            gid = groups.get(sid)
+            if gid:
+                el.set("data-group", gid)
         pos += 1
     return etree.tostring(tree, encoding="unicode")
 

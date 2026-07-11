@@ -15,7 +15,7 @@ Endpoints:
   POST /api/align/save          → write augmented TEI files
 """
 
-import os, json, math, csv, io, shutil
+import os, json, math, csv, io, shutil, hashlib
 from pathlib import Path
 from typing import Optional
 from xml.etree import ElementTree as ET
@@ -140,8 +140,14 @@ def get_witness_xml(witness_id: str):
     if xml_path.exists():
         tags = _ALIGN_ANCHOR.get("tags") or None
         unit = _ALIGN_ANCHOR.get("unit") or ""
+        # Also stamp a shared `data-group` (#9) at the default grouping threshold,
+        # so clicking a fragment can highlight its reading across all texts with a
+        # pure CSS selector. The frontend can re-sync groups at another threshold
+        # via /api/align/groups without re-fetching the text.
+        groups = _compute_groups(GROUP_THRESHOLD)[1] if _RELATIONS else None
         try:
-            content = _align.annotate_witness_xml(xml_path, witness_id, tags=tags, unit=unit)
+            content = _align.annotate_witness_xml(
+                xml_path, witness_id, tags=tags, unit=unit, groups=groups)
         except Exception:
             content = xml_path.read_text()
         return Response(content=content, media_type="application/xml")
@@ -425,6 +431,12 @@ _RELATIONS: dict = {}
 # filter by score at read time (#7). align-lab's default is 0.1.
 REL_THRESHOLD = 0.1
 
+# Default similarity floor for GROUPING segments into shared "reading" clusters
+# (#9). Only edges at/above this score connect segments into a group, so a group
+# means "confidently the same reading" rather than a loose chain. Exposed as a
+# view-time parameter (min_score) so it can be tuned without re-running alignment.
+GROUP_THRESHOLD = 0.45
+
 from . import align_segments as _align
 from .lab_similarity import Bundle, hybrid_score
 
@@ -434,6 +446,85 @@ def _make_seg_id(wid: str, unit: str, pos: int) -> str:
     "{wid}:{pos}". Single source of the scheme shared by the matrix, the relation
     graph, and the data-ids injected into served XML."""
     return f"{wid}:{unit}:{pos}" if unit else f"{wid}:{pos}"
+
+
+def _compute_groups(min_score: float):
+    """Cluster segments into shared "reading" groups (#9) from the relation graph.
+
+    A reading group holds AT MOST ONE segment per witness — it represents "the same
+    place across witnesses", not a chain of look-alike lines. We build groups
+    greedily: consider the strongest edges first (score >= min_score) and merge the
+    two segments' groups only if they don't already share a witness; a merge that
+    would put two fragments of the same text together is rejected. This prevents the
+    transitive-closure "hairball" that plain connected components produce on
+    repetitive texts, so group size is bounded by the number of witnesses.
+
+    Each group gets one stable id (a hash of its members) shared by every member, so
+    clicking any fragment can highlight the whole reading across all texts. Singletons
+    (no qualifying link) are omitted — they have no parallels. Returns:
+      groups       = {group_id: [sorted seg_ids]}
+      seg_to_group = {seg_id: group_id}
+    min_score is a view-time knob (#7): nothing is deleted, we just re-partition the
+    graph that already keeps every edge."""
+    parent: dict = {}
+    wits: dict = {}  # component root -> set of witness ids currently in that group
+
+    def _wid(sid: str) -> str:
+        seg = _SEGMENTS.get(sid)
+        return seg["wid"] if seg else sid.rsplit(":", 1)[0]
+
+    def find(x: str) -> str:
+        if x not in parent:
+            parent[x] = x
+            wits[x] = {_wid(x)}
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]  # path compression
+            x = parent[x]
+        return x
+
+    def union(a: str, b: str):
+        """Merge only if the two groups share no witness (one-per-witness rule)."""
+        ra, rb = find(a), find(b)
+        if ra == rb:
+            return
+        if wits[ra] & wits[rb]:
+            return  # would collide two segments of the same witness — keep apart
+        parent[ra] = rb
+        wits[rb] |= wits[ra]
+        wits.pop(ra, None)
+
+    # Unique cross-witness edges at/above the threshold, strongest first, so the
+    # most confident links claim their witness slot before weaker ones can.
+    seen: set = set()
+    edges: list = []
+    for sid, elist in _RELATIONS.items():
+        for other_id, score in elist:
+            if score < min_score:
+                continue
+            key = (sid, other_id) if sid < other_id else (other_id, sid)
+            if key in seen:
+                continue
+            seen.add(key)
+            edges.append((score, key[0], key[1]))
+    edges.sort(reverse=True)
+    for _score, a, b in edges:
+        union(a, b)
+
+    comps: dict = {}
+    for node in parent:
+        comps.setdefault(find(node), []).append(node)
+
+    groups: dict = {}
+    seg_to_group: dict = {}
+    for members in comps.values():
+        if len(members) < 2:
+            continue
+        members = sorted(members)
+        gid = "g" + hashlib.sha1(",".join(members).encode("utf-8")).hexdigest()[:12]
+        groups[gid] = members
+        for m in members:
+            seg_to_group[m] = gid
+    return groups, seg_to_group
 
 
 # Sidecar holding the last alignment run's parameters. The alignment itself is
@@ -740,6 +831,26 @@ def align_related(seg_id: str, min_score: float = 0.0):
         "n":       seg["n"],
         "text":    seg["text"],
         "related": related,
+    }
+
+
+@app.get("/api/align/groups")
+def align_groups(min_score: float = GROUP_THRESHOLD):
+    """Shared "reading" groups across all witnesses (#9). Clusters segments into
+    connected components over relation edges with score >= min_score, giving each
+    group one id that every member shares — so clicking any fragment can highlight
+    the whole reading in every text (Option B). min_score is a view-time knob (#7):
+    raise it for tighter, more confident groups; lower it to merge weaker matches.
+    Returns groups (id -> member seg_ids) and seg_to_group (seg_id -> id).
+    Requires a prior /api/align/run."""
+    if not _SEGMENTS:
+        raise HTTPException(400, "No relations available. Run alignment first.")
+    groups, seg_to_group = _compute_groups(min_score)
+    return {
+        "min_score":    min_score,
+        "count":        len(groups),
+        "groups":       groups,
+        "seg_to_group": seg_to_group,
     }
 
 
