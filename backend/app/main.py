@@ -18,7 +18,10 @@ Endpoints:
 import os, json, math, csv, io, shutil, hashlib
 from pathlib import Path
 from typing import Optional
-from xml.etree import ElementTree as ET
+# lxml (not stdlib ElementTree) so upload parsing matches the alignment engine and
+# the alignment lab: it tolerates TEI quirks stdlib rejects, e.g. a non-canonical
+# encoding label like <?xml ... encoding='UTF8'?> which breaks expat on non-ASCII text.
+from lxml import etree as ET
 
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
@@ -46,7 +49,7 @@ app.add_middleware(
 # ── TEI parsing ────────────────────────────────────────────────────
 
 def parse_witness(path: Path) -> dict:
-    tree = ET.parse(path)
+    tree = ET.parse(str(path))
     root = tree.getroot()
     ns = {"tei": TEI_NS}
     segments = {}
