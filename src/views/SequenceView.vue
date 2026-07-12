@@ -1,11 +1,12 @@
 <script setup>
 import { onMounted, ref, watch } from 'vue'
-import { useStorage, watchDebounced } from '@vueuse/core'
+import { watchDebounced } from '@vueuse/core'
 import TextSequence from '@/components/TextSequence.vue'
 import { useZoom } from '@/composables/zoom'
 import { useAlignment } from '@/composables/align'
+import { useIndexedDBStore } from '@/composables/db'
 
-const documents = useStorage('documents', [], localStorage)
+const { documents } = useIndexedDBStore()
 const wrapper = ref(null)
 const { currentZoom } = useZoom(wrapper)
 const { alignedGroupId, alignSections, highlightSections, unhighlightSections } =
@@ -45,8 +46,8 @@ watchDebounced(
 <template>
   <div id="sequences" ref="wrapper">
     <TextSequence
-      v-for="(doc, index) in documents"
-      :key="index"
+      v-for="doc in documents"
+      :key="doc.key + doc.content.length.toString()"
       :xmlString="doc.content"
     ></TextSequence>
   </div>

@@ -1,11 +1,11 @@
 <script setup>
 import { ref, watch } from 'vue'
-import { useFileDialog, useDropZone, useStorage } from '@vueuse/core'
+import { useFileDialog, useDropZone } from '@vueuse/core'
+import { useIndexedDBStore } from '@/composables/db'
 
 const emit = defineEmits(['documents-updated'])
 
-// Reactive storage for files
-const documents = useStorage('documents', [], localStorage)
+const { documents, dbExec } = useIndexedDBStore()
 
 // File dialog for browsing
 const {
@@ -34,18 +34,23 @@ watch(selectedFiles, (newFiles) => {
 /**
  * Process uploaded files from dialog or drop and save them.
  *
- * @param {Array} fileList
+ * @param {Array} fileList - Uploaded files
+ * @returns {Promise<void>} - Promise that esolves when all files have been processed.
  * @emits documents-updated
  */
 // Process files (from dialog or drop)
 const processFiles = async (fileList) => {
-  const newFiles = await Promise.all(
+  await Promise.all(
     Array.from(fileList).map(async (file) => {
       const content = await readFileAsText(file)
-      return { name: file.name, size: file.size, content }
+      await dbExec('documents', 'add', {
+        id: file.name.split('.', 1)[0],
+        name: file.name,
+        size: file.size,
+        content,
+      })
     }),
   )
-  documents.value = [...documents.value, ...newFiles]
   emit('documents-updated', documents.value)
 }
 
@@ -53,7 +58,7 @@ const processFiles = async (fileList) => {
  * Read a file as text.
  *
  * @param file - The file to read.
- * @returns {Promise} - Promise that resolves with the text.
+ * @returns {Promise<string>} - Promise that resolves with the text.
  */
 const readFileAsText = (file) => {
   return new Promise((resolve) => {
@@ -66,20 +71,23 @@ const readFileAsText = (file) => {
 /**
  * Remove a file from upload.
  *
- * @param {number} index - List index of the file to remove.
+ * @param {number} id - ID of the file to remove.
+ * @returns {Promise<void>} - Resolves when file has been deleted.
  * @emits documents-updated
  */
-const removeFile = (index) => {
-  documents.value.splice(index, 1)
+const removeFile = async (key) => {
+  await dbExec('documents', 'delete', key)
   emit('documents-updated', documents.value)
 }
 
 /**
  * Clear all files from upload.
+ *
+ * @returns {Promise<void>} - Resolves when the table has been cleared.
  * @emits documents-updated
  */
-const clearFiles = () => {
-  documents.value = []
+const clearFiles = async () => {
+  await dbExec('documents', 'clear')
   emit('documents-updated', documents.value)
 }
 </script>
@@ -95,9 +103,9 @@ const clearFiles = () => {
       <button @click="clearFiles" class="clear">Clear All</button>
       <h3>Uploaded Files:</h3>
       <ul>
-        <li v-for="(file, index) in documents" :key="index" class="file-item">
+        <li v-for="file in documents" :key="file.key" class="file-item">
           <span>{{ file.name }} ({{ Math.round(file.size / 1000) }} kB)</span>
-          <button @click="removeFile(index)" class="remove" aria-label="remove file">
+          <button @click="removeFile(file.key)" class="remove" aria-label="remove file">
             &times;
           </button>
         </li>
