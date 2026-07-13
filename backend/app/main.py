@@ -16,7 +16,7 @@ Endpoints:
   POST /api/align/save          → write augmented TEI files
 """
 
-import os, json, math, csv, io, shutil, hashlib
+import os, json, math, csv, io, shutil, hashlib, re
 from pathlib import Path
 from typing import Optional
 # lxml (not stdlib ElementTree) so upload parsing matches the alignment engine and
@@ -69,8 +69,9 @@ def parse_witness(path: Path) -> dict:
     return {
         "id":       path.stem,
         "title":    title_el.text  if title_el  is not None else path.stem,
-        "year":     int(date_el.get("when", date_el.text or "0")[:4])
-                    if date_el is not None else None,
+        "year":     (lambda s: int(m.group()) if (m := re.search(r'\d{4}', s)) else None)(
+                        date_el.get("when", date_el.text or "")
+                    ) if date_el is not None else None,
         "origin":   origin_el.text if origin_el is not None else None,
         "segments": segments,
     }
