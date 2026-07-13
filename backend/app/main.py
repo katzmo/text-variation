@@ -12,6 +12,7 @@ Endpoints:
   GET  /api/align/witnesses     → witnesses available for alignment + line counts
   POST /api/align/run           → run line alignment against an anchor
   GET  /api/align/inspect/{id}  → paginated alignment results for one witness
+  GET  /api/align/witnesses/{id}/scores → all pairwise scores for one witness (batch)
   POST /api/align/save          → write augmented TEI files
 """
 
@@ -855,6 +856,46 @@ def align_groups(min_score: float = GROUP_THRESHOLD):
         "groups":       groups,
         "seg_to_group": seg_to_group,
     }
+
+
+@app.get("/api/align/witnesses/{witness_id}/scores")
+def align_witness_scores(witness_id: str):
+    """All pairwise scores for every segment in one witness, in a single response.
+
+    Returns each segment of `witness_id` with the full list of cross-witness
+    matches and their scores (sourced from the in-memory relation graph, same
+    data as /api/align/related but batched by witness). The frontend can:
+      - compute an average score per segment for background colouring (no
+        reference text needed);
+      - recompute that average on the fly when witnesses are hidden, by
+        filtering the returned `scores` list to only visible witness ids.
+    Requires a prior /api/align/run."""
+    if not _SEGMENTS:
+        raise HTTPException(400, "No relations available. Run alignment first.")
+    segments = [
+        (seg_id, meta)
+        for seg_id, meta in _SEGMENTS.items()
+        if meta["wid"] == witness_id
+    ]
+    if not segments:
+        raise HTTPException(404, f"No segments found for witness '{witness_id}'. "
+                                 "Check the witness id or run alignment first.")
+    segments.sort(key=lambda x: x[1]["pos"])
+    result = []
+    for seg_id, meta in segments:
+        scores = [
+            {"seg_id": other_id, "witness": _SEGMENTS[other_id]["wid"], "score": score}
+            for other_id, score in _RELATIONS.get(seg_id, [])
+            if other_id in _SEGMENTS
+        ]
+        scores.sort(key=lambda x: -x["score"])
+        result.append({
+            "seg_id": seg_id,
+            "n":      meta["n"],
+            "text":   meta["text"],
+            "scores": scores,
+        })
+    return {"witness_id": witness_id, "segments": result}
 
 
 @app.post("/api/align/save")
