@@ -383,7 +383,7 @@ def align_witness(
     witness_lines: list,
     anchor_lines: list,
     anchor_idx: dict,
-    threshold: float = 0.35,
+    threshold: float = 0.1,
     top_k: int = 15,
     min_word_len: int = 3,
     anchor_sets: list = None,
