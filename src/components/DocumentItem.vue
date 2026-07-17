@@ -63,3 +63,9 @@ li button {
   font-family: monospace;
 }
 </style>
+
+<style>
+.modal-content .text .identifier {
+  display: none;
+}
+</style>

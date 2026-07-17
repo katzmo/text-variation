@@ -1,38 +1,15 @@
 <script setup>
-import { onMounted, ref } from 'vue'
-import CETEI from 'CETEIcean'
+import { ref } from 'vue'
+import { useCETEI } from '@/composables/cetei'
 
 const props = defineProps({
   xmlString: String,
 })
 
 const display = ref()
+const { appendXmlString } = useCETEI()
 
-onMounted(async () => {
-  const CETEIcean = new CETEI({ ignoreFragmentId: true })
-  CETEIcean.addBehaviors({
-    tei: {
-      // Display document ID
-      TEI: (el) => {
-        const xmlId = el.getAttribute('xml:id')
-        if (xmlId) {
-          el.insertAdjacentHTML('afterbegin', `<div class="identifier">${xmlId}</div>`)
-        }
-      },
-      // Render line breaks
-      lb: ['<br>'],
-      // Display a reason in gaps
-      gap: ['<span class="reason">$@reason</span>'],
-      // Display header information
-      teiHeader: null,
-    },
-  })
-  if (props.xmlString) {
-    CETEIcean.makeHTML5(props.xmlString, (data) => {
-      display.value.appendChild(data)
-    })
-  }
-})
+appendXmlString(display, props.xmlString)
 </script>
 
 <template>
