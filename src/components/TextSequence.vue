@@ -43,6 +43,10 @@ appendXmlString(display, props.xmlString)
     transition: filter 400ms ease-in-out;
   }
 
+  .highlighted:not(.aligned) {
+    filter: brightness(0.8);
+  }
+
   .aligned {
     outline: 0.25rem solid var(--color-border-hover);
     outline-offset: 0.5rem;

@@ -8,9 +8,18 @@ import { useAlignment } from '@/composables/align'
 const documents = useStorage('documents', [], localStorage)
 const wrapper = ref(null)
 const { currentZoom } = useZoom(wrapper)
-const { alignedGroupId, alignSections } = useAlignment(wrapper)
+const { alignedGroupId, alignSections, highlightSections, unhighlightSections } =
+  useAlignment(wrapper)
 
 onMounted(() => {
+  // Add hover background
+  wrapper.value.addEventListener('mouseover', (event) => {
+    highlightSections(`[data-group="${event.target.dataset.group}"]`)
+  })
+  // Remove hover background
+  wrapper.value.addEventListener('mouseout', (event) => {
+    unhighlightSections(`[data-group="${event.target.dataset.group}"]`)
+  })
   // Align sections
   wrapper.value.addEventListener('click', (event) => {
     const groupId = event.target.dataset.group

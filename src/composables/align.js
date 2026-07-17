@@ -6,10 +6,11 @@ import { ref } from 'vue'
  * @param {Object} wrapper - A ref object of the DOM element containing matched sequences.
  * @param {Object} [options] - Configuration options for alignment behavior.
  * @param {number} [options.alignedClass='aligned'] - Class to set when a group is aligned.
+ * @param {number} [options.highlightedClass='highlighted'] - Class to set when a group is highlighted.
  * @returns {Object} An object containing alignment-related functions and reactive properties.
  */
 export function useAlignment(wrapper, options = {}) {
-  const { alignedClass = 'aligned' } = options
+  const { alignedClass = 'aligned', highlightedClass = 'highlighted' } = options
 
   /*
    * Reactive storage for the currently selected group.
@@ -45,5 +46,29 @@ export function useAlignment(wrapper, options = {}) {
     })
   }
 
-  return { alignedGroupId, alignSections }
+  /**
+   * Add the highlighted class on all section elements matching the selector.
+   *
+   * @param {string} selector - A selector for section elements.
+   */
+  const highlightSections = (selector) => {
+    const sections = wrapper.value.querySelectorAll(selector)
+    sections.forEach((el) => {
+      el.classList.add(highlightedClass)
+    })
+  }
+
+  /**
+   * Remove the highlighted class on all section elements matching the selector.
+   *
+   * @param {string} selector - A selector for section elements.
+   */
+  const unhighlightSections = (selector) => {
+    const sections = wrapper.value.querySelectorAll(selector)
+    sections.forEach((el) => {
+      el.classList.remove(highlightedClass)
+    })
+  }
+
+  return { alignedGroupId, alignSections, highlightSections, unhighlightSections }
 }
