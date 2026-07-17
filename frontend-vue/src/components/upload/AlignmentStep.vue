@@ -120,7 +120,7 @@
     <!-- Overview -->
     <div v-else>
       <div class="align-controls">
-        <div class="align-ctrl-group">
+        <!--<div class="align-ctrl-group">
           <label class="align-ctrl-label">Anchor witness</label>
           <select class="col-settings-select" v-model="anchorId" style="width: 220px">
             <option v-for="w in witList" :key="w.id" :value="w.id">
@@ -132,10 +132,9 @@
           <span style="font-size: 11px; color: var(--ink3); font-family: var(--mono)">
             ★ longest = suggested
           </span>
-        </div>
-        <div class="align-ctrl-group">
-          <label class="align-ctrl-label"
-            >Match threshold: <strong>{{ threshold }}</strong>
+        </div>-->
+        <!--<div class="align-ctrl-group">
+          <label class="align-ctrl-label">Match threshold: <strong>{{ threshold }}</strong>
             <span class="align-thresh-label">{{ threshLabel }}</span>
           </label>
           <div style="display: flex; align-items: center; gap: 8px">
@@ -155,7 +154,7 @@
             </span>
           </div>
           <div class="align-thresh-desc">{{ threshDesc }}</div>
-        </div>
+        </div>-->
         <div class="align-ctrl-group">
           <label class="align-ctrl-label">Segment by tags</label>
           <input
@@ -185,17 +184,14 @@
       <div v-if="results">
         <div class="align-results-header">
           <span style="font-family: var(--serif); font-size: 13px; font-weight: 700">
-            Results — anchor: {{ results.anchor_id }}
+            Results — pairs: {{ results.relations }}
           </span>
-          <button
-            class="btn-secondary"
-            style="margin-left: auto; padding: 5px 12px; font-size: 11px"
-            @click="saveAlignment"
-          >
+          <!--<button class="btn-secondary" style="margin-left: auto; padding: 5px 12px; font-size: 11px"
+            @click="saveAlignment">
             💾 Save augmented TEI
-          </button>
+          </button>-->
         </div>
-        <table class="align-table">
+        <!--<table class="align-table">
           <thead>
             <tr>
               <th>Witness</th>
@@ -247,7 +243,7 @@
               </td>
             </tr>
           </tbody>
-        </table>
+        </table>-->
       </div>
       <div
         v-else
@@ -259,7 +255,7 @@
           color: var(--ink3);
         "
       >
-        Choose an anchor witness and threshold, then click Run alignment.
+        Click Run alignment.
       </div>
     </div>
   </div>
@@ -282,7 +278,7 @@ const status = ref('')
 const witList = ref([])
 const suggested = ref('')
 const anchorId = ref('')
-const threshold = ref(0.35)
+const threshold = ref(0.1)
 // Comma-separated TEI tags to segment by (e.g. "p,lg"). Empty = line-level.
 const tags = ref('')
 const results = ref(null)
