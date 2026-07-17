@@ -33,7 +33,8 @@ appendXmlString(display, props.xmlString)
     margin-right: auto;
   }
 
-  .text-segment {
+  .text-segment,
+  [data-id] {
     display: block;
     text-align: justify;
     padding: 0.5em;
@@ -42,11 +43,21 @@ appendXmlString(display, props.xmlString)
     transition: filter 400ms ease-in-out;
   }
 
+  .aligned {
+    outline: 0.25rem solid var(--color-border-hover);
+    outline-offset: 0.5rem;
+    border-radius: var(--border-radius);
+    position: relative;
+    z-index: 1;
+  }
+
   .identifier {
     background-color: var(--color-background);
     font-size: max(75%, 100% * var(--zoom-level));
     text-align: center;
+    margin-bottom: 0.5rem;
     position: sticky;
+    z-index: 10;
     top: 0;
   }
 }

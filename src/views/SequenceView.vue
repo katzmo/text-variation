@@ -1,16 +1,40 @@
 <script setup>
-import { ref } from 'vue'
-import { useStorage } from '@vueuse/core'
+import { onMounted, ref, watch } from 'vue'
+import { useStorage, watchDebounced } from '@vueuse/core'
 import TextSequence from '@/components/TextSequence.vue'
 import { useZoom } from '@/composables/zoom'
+import { useAlignment } from '@/composables/align'
 
 const documents = useStorage('documents', [], localStorage)
-const zoomWrapper = ref(null)
-useZoom(zoomWrapper)
+const wrapper = ref(null)
+const { currentZoom } = useZoom(wrapper)
+const { alignedGroupId, alignSections } = useAlignment(wrapper)
+
+onMounted(() => {
+  // Align sections
+  wrapper.value.addEventListener('click', (event) => {
+    const groupId = event.target.dataset.group
+    if (groupId) alignedGroupId.value = groupId
+  })
+})
+
+watch(alignedGroupId, (newId) => {
+  alignSections(`[data-group="${newId}"]`, '.text-sequence', currentZoom.value)
+})
+
+watchDebounced(
+  currentZoom,
+  (newValue) => {
+    if (alignedGroupId.value) {
+      alignSections(`[data-group="${alignedGroupId.value}"]`, '.text-sequence', newValue, false)
+    }
+  },
+  { debounce: 333 },
+)
 </script>
 
 <template>
-  <div id="sequences" ref="zoomWrapper">
+  <div id="sequences" ref="wrapper">
     <TextSequence
       v-for="(doc, index) in documents"
       :key="index"
