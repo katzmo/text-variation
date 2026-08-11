@@ -165,6 +165,14 @@
                   />
                   <span>{{ graphZoom.toFixed(2) }}</span>
                 </div>
+                <button
+                  class="vg-strip-toggle"
+                  :class="{ active: graphShowMerged }"
+                  @click="graphShowMerged = !graphShowMerged"
+                  title="Show every merged reading stacked above each node"
+                >
+                  show merged words
+                </button>
               </div>
             </div>
             <div class="vg-strip-scroll">
@@ -174,6 +182,7 @@
                 :hovered-translation="graphHovered"
                 :selected-witness="selectedWit"
                 :zoom="graphZoom"
+                :show-merged="graphShowMerged"
                 @hover="graphHovered = $event"
                 @select="selectedWit = $event"
               />
@@ -253,6 +262,9 @@ const graphTranslationOrder = computed(() => visibleCols.value.map((w) => w.id))
 const graphThreshold = ref(1)
 // 0 = witness lines bundled into one flow per node, 1 = full per-witness detail.
 const graphZoom = ref(1)
+// When on, nodes with merged-together readings show every distinct spelling
+// stacked above the pill instead of just the majority word.
+const graphShowMerged = ref(false)
 
 // ── Computed ─────────────────────────────────────────────────────────────────
 const cw = computed(() => Math.max(30, Math.round(zoom.value * 0.68)))
@@ -1052,6 +1064,27 @@ defineExpose({ segs, colOrder, tree })
   width: 80px;
   height: 3px;
   accent-color: var(--ink);
+}
+
+.vg-strip-toggle {
+  font-family: var(--mono);
+  font-size: 0.8em;
+  color: var(--ink2);
+  background: var(--bg);
+  border: 1px solid var(--border2);
+  border-radius: 4px;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+
+.vg-strip-toggle:hover {
+  background: var(--bg-hover);
+}
+
+.vg-strip-toggle.active {
+  background: var(--ink);
+  color: #fff;
+  border-color: var(--ink);
 }
 
 .vg-strip-scroll {

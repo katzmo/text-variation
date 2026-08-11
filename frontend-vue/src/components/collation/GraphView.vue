@@ -14,9 +14,10 @@
         fontSize: '12px',
         pointerEvents: 'none',
         zIndex: 1000,
+        whiteSpace: 'pre-line',
       }"
     >
-      {{ tooltip.translation }}
+      {{ tooltip.text }}
     </div>
   </div>
 </template>
@@ -32,6 +33,7 @@ const props = defineProps({
   hoveredTranslation: { type: String, default: null },
   selectedWitness: { type: String, default: null },
   zoom: { type: Number, default: 1 },
+  showMerged: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['hover', 'select'])
@@ -142,6 +144,7 @@ function computeNodePositions(data, translationOrder) {
         translations: [...group.translations].sort(
           (a, b) => translationOrder.indexOf(a) - translationOrder.indexOf(b),
         ),
+        readings: group.readings,
       }
     })
 
@@ -191,6 +194,33 @@ function buildPaths(data, nodes, translationOrder, zoom) {
   })
 }
 
+// A pill's word is just the majority reading; when the merge threshold fuses
+// distinct spellings into one group, the minority readings are otherwise
+// invisible. Break the group down by distinct word, most frequent first, so
+// it can be surfaced on hover and (optionally) as stacked labels.
+function getWordBreakdown(node) {
+  if (!node.readings) return [{ word: node.word, wits: node.translations }]
+  const byWord = new Map()
+  node.translations.forEach((t) => {
+    const word = node.readings[t] ?? node.word
+    if (!byWord.has(word)) byWord.set(word, [])
+    byWord.get(word).push(t)
+  })
+  return [...byWord.entries()]
+    .map(([word, wits]) => ({ word, wits }))
+    .sort((a, b) => b.wits.length - a.wits.length)
+}
+
+// Returns null when the group has no more than one distinct reading (nothing
+// merged away, so there's nothing extra to show).
+function buildNodeTooltip(node) {
+  const breakdown = getWordBreakdown(node)
+  if (breakdown.length <= 1) return null
+  return breakdown
+    .map(({ word, wits }) => `${word === '-' ? '∅' : word}: ${wits.join(', ')}`)
+    .join('\n')
+}
+
 // ── Draw ──────────────────────────────────────────────────────────────────────
 function drawGraph() {
   if (!svgRef.value || props.data.length === 0) return
@@ -231,7 +261,7 @@ function drawGraph() {
       .attr('class', `path-${CSS.escape(translation)}`)
       .style('cursor', 'pointer')
       .on('mouseenter', function (event) {
-        tooltip.value = { x: event.clientX, y: event.clientY, translation }
+        tooltip.value = { x: event.clientX, y: event.clientY, text: translation }
         emit('hover', translation)
       })
       .on('mouseleave', () => {
@@ -269,6 +299,7 @@ function drawGraph() {
       const pillY = node.y - pillHeight / 2
       const radius = PILL_WIDTH / 2
       const isEmpty = node.word === '-'
+      const nodeTooltip = buildNodeTooltip(node)
 
       g.append('rect')
         .attr('x', pillX)
@@ -281,15 +312,40 @@ function drawGraph() {
         .attr('stroke', '#ccc')
         .attr('stroke-width', 1)
         .attr('opacity', isEmpty ? 0.5 : 1.0)
+        .style('cursor', nodeTooltip ? 'help' : null)
+        .on('mouseenter', (event) => {
+          if (!nodeTooltip) return
+          tooltip.value = { x: event.clientX, y: event.clientY, text: nodeTooltip }
+        })
+        .on('mouseleave', () => {
+          if (nodeTooltip) tooltip.value = null
+        })
 
-      g.append('text')
-        .attr('x', node.x)
-        .attr('y', pillY - 6)
-        .attr('text-anchor', 'middle')
-        .attr('font-size', '11px')
-        .attr('fill', '#444')
-        .attr('opacity', isEmpty ? 0.5 : 1.0)
-        .text(node.word === '-' ? '∅' : node.word)
+      // With showMerged on, stack every distinct reading above the node instead
+      // of collapsing to the majority word — most frequent nearest the pill.
+      const stacked = props.showMerged ? getWordBreakdown(node) : null
+      if (stacked && stacked.length > 1) {
+        const LABEL_LINE_H = 11
+        stacked.forEach(({ word }, i) => {
+          g.append('text')
+            .attr('x', node.x)
+            .attr('y', pillY - 6 - i * LABEL_LINE_H)
+            .attr('text-anchor', 'middle')
+            .attr('font-size', '10px')
+            .attr('fill', '#444')
+            .attr('opacity', word === '-' ? 0.5 : 1.0)
+            .text(word === '-' ? '∅' : word)
+        })
+      } else {
+        g.append('text')
+          .attr('x', node.x)
+          .attr('y', pillY - 6)
+          .attr('text-anchor', 'middle')
+          .attr('font-size', '11px')
+          .attr('fill', '#444')
+          .attr('opacity', isEmpty ? 0.5 : 1.0)
+          .text(node.word === '-' ? '∅' : node.word)
+      }
     })
   })
 }
@@ -315,7 +371,11 @@ function applyHighlight() {
 // ── Watchers ──────────────────────────────────────────────────────────────────
 // zoom changes node y-positions (see buildPaths), so it needs a full redraw,
 // not just an attribute tweak.
-watch(() => [props.data, props.translationOrder, props.zoom], drawGraph, { deep: true })
+watch(
+  () => [props.data, props.translationOrder, props.zoom, props.showMerged],
+  drawGraph,
+  { deep: true },
+)
 
 watch(() => [props.hoveredTranslation, props.selectedWitness], applyHighlight)
 

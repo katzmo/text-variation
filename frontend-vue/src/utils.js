@@ -95,7 +95,12 @@ export function groupPositionBySimilarity(currentReading, witnessIds, threshold)
         representative = word
       }
     }
-    return { representative: representative || '-', translations: group }
+    return {
+      representative: representative || '-',
+      translations: group,
+      // Per-witness reading within the group, so merged-away variants aren't lost.
+      readings: Object.fromEntries(group.map((w) => [w, currentReading[w] || '-'])),
+    }
   })
 }
 
