@@ -226,6 +226,23 @@ function buildNodeTooltip(node) {
     .join('\n')
 }
 
+function getBundledWitnesses(nodes, xScale, dataLength, translation, pointerX) {
+  const colX = Array.from({ length: dataLength }, (_, pi) => xScale(pi.toString()))
+  let si = Math.max(colX.length - 2, 0)
+  for (let i = 0; i < colX.length - 1; i++) {
+    if (pointerX <= colX[i + 1]) {
+      si = i
+      break
+    }
+  }
+  const nodeA = nodes[si]?.find((n) => n.translations.includes(translation))
+  if (!nodeA) return [translation]
+  const nodeB = nodes[si + 1]?.find((n) => n.translations.includes(translation))
+  if (!nodeB) return nodeA.translations
+  const setB = new Set(nodeB.translations)
+  return nodeA.translations.filter((t) => setB.has(t))
+}
+
 // ── Draw ──────────────────────────────────────────────────────────────────────
 function drawGraph() {
   if (!svgRef.value || props.data.length === 0) return
@@ -266,12 +283,25 @@ function drawGraph() {
       .attr('class', `path-${CSS.escape(translation)}`)
       .style('cursor', 'pointer')
       .on('mouseenter', function (event) {
+        if (props.zoom === 0) {
+          const [pointerX] = d3.pointer(event, g.node())
+          const bundle = getBundledWitnesses(nodes, xScale, props.data.length, translation, pointerX)
+          if (bundle.length > 1) {
+            tooltip.value = { x: event.clientX, y: event.clientY, text: `Bundled: ${bundle.join(', ')}` }
+            edgeGroup.selectAll('path').attr('stroke-opacity', 0.3)
+            bundle.forEach((t) => {
+              edgeGroup.select(`.path-${CSS.escape(t)}`).attr('stroke-opacity', 1).raise()
+            })
+            return
+          }
+        }
         tooltip.value = { x: event.clientX, y: event.clientY, text: translation }
         emit('hover', translation)
       })
       .on('mouseleave', () => {
         tooltip.value = null
         emit('hover', null)
+        applyHighlight()
       })
       .on('click', () => {
         emit('select', translation)
