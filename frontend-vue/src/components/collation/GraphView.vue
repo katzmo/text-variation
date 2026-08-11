@@ -45,6 +45,11 @@ const MARGIN = { top: 40, right: 120, bottom: 20, left: 20 }
 const INNER_H = HEIGHT - MARGIN.top - MARGIN.bottom
 const PILL_WIDTH = 14
 const LANE_HEIGHT = 6
+const PILL_FILL = '#e8e8e8'
+// Amber highlight on hover for nodes with more than one merged-away reading,
+// matching the amber used for highlighted collation cells elsewhere in the app.
+const PILL_MERGED_HOVER_FILL = '#f5dfa0'
+const PILL_MERGED_HOVER_STROKE = '#c8860a'
 
 // ── DOM refs / state ──────────────────────────────────────────────────────────
 const svgRef = ref(null)
@@ -308,17 +313,20 @@ function drawGraph() {
         .attr('height', pillHeight)
         .attr('rx', radius)
         .attr('ry', radius)
-        .attr('fill', '#e8e8e8')
+        .attr('fill', PILL_FILL)
         .attr('stroke', '#ccc')
         .attr('stroke-width', 1)
         .attr('opacity', isEmpty ? 0.5 : 1.0)
         .style('cursor', nodeTooltip ? 'help' : null)
-        .on('mouseenter', (event) => {
+        .on('mouseenter', function (event) {
           if (!nodeTooltip) return
           tooltip.value = { x: event.clientX, y: event.clientY, text: nodeTooltip }
+          d3.select(this).attr('fill', PILL_MERGED_HOVER_FILL).attr('stroke', PILL_MERGED_HOVER_STROKE)
         })
-        .on('mouseleave', () => {
-          if (nodeTooltip) tooltip.value = null
+        .on('mouseleave', function () {
+          if (!nodeTooltip) return
+          tooltip.value = null
+          d3.select(this).attr('fill', PILL_FILL).attr('stroke', '#ccc')
         })
 
       // With showMerged on, stack every distinct reading above the node instead
