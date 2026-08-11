@@ -216,6 +216,10 @@ const BADGE_COLORS = ['cb0', 'cb1', 'cb2', 'cb3', 'cb4', 'cb5']
 // Saturated accent colors matching each .col-badge.cbN border-color in CollationView's
 // styles, so other views (e.g. the variant graph) can render witnesses in the same hue.
 const BADGE_ACCENTS = ['#999999', '#e09880', '#88c480', '#80a8d4', '#d4c464', '#b490cc']
+// Neutral grey used whenever a witness has no id to hash (or no color was
+// otherwise assigned to it) — keeps rendering safe instead of falling through
+// to undefined.
+const DEFAULT_WITNESS_COLOR = BADGE_ACCENTS[0]
 
 function badgeIndex(wi, id) {
   if (!id) return wi % 6
@@ -229,7 +233,8 @@ export function badgeClass(wi, id) {
 }
 
 export function witnessColor(id) {
-  return BADGE_ACCENTS[badgeIndex(0, id)]
+  if (!id) return DEFAULT_WITNESS_COLOR
+  return BADGE_ACCENTS[badgeIndex(0, id)] || DEFAULT_WITNESS_COLOR
 }
 
 // ── TEI file parsing (browser-side) ─────────────────────────────────────────
