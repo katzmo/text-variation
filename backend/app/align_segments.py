@@ -275,8 +275,13 @@ def load_witness_tags(tree, tags: list) -> list:
 
 def load_witness(path: Path, tags: Optional[list] = None) -> list:
     """Return list of (local_n: int, clean_text: str) for a witness file."""
-    tree = etree.parse(str(path))
-    return _lines_from_segments(*collect_segments(tree, tags))
+    try:
+        tree = etree.parse(str(path))
+        return _lines_from_segments(*collect_segments(tree, tags))
+    except etree.XMLSyntaxError:
+        with path.open("r", encoding="utf-8") as file:
+            lines = file.readlines()
+        return [(i+1, l.strip()) for i, l in enumerate(lines) if l.strip()]
 
 
 def _seg_id(witness_id: str, unit: str, pos: int) -> str:

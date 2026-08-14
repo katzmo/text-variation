@@ -79,7 +79,7 @@ def parse_witness(path: Path) -> dict:
 def parse_plain(path: Path) -> dict:
     """Parse plain text: each non-empty line is a segment."""
     lines = [l.strip() for l in path.read_text(encoding="utf-8").splitlines() if l.strip()]
-    segments = {f"seg-{str(i+1).padStart(3,'0')}": l for i, l in enumerate(lines)}
+    segments = {f"row-{str(i+1)}": l for i, l in enumerate(lines)}
     return {"id": path.stem, "title": path.stem, "year": None, "origin": None, "segments": segments}
 
 # ── helpers ────────────────────────────────────────────────────────
@@ -214,7 +214,7 @@ async def collate(req: CollateRequest):
     witnesses = []
     for f in list_witness_files():
         if f.stem.startswith("_"): continue
-        w = parse_witness(f) if f.suffix == ".xml" else {"id": f.stem, "segments": {}}
+        w = parse_witness(f) if f.suffix == ".xml" else parse_plain(f)
         witnesses.append(w)
     if req.witness_ids:
         witnesses = [w for w in witnesses if w["id"] in req.witness_ids]
@@ -578,7 +578,7 @@ def _load_lines_cached(path: Path, tags: list = None) -> list:
 def align_witnesses():
     """List witnesses available for alignment with their line counts."""
     result = []
-    for f in sorted(DATA_DIR.glob("*.xml")):
+    for f in sorted(DATA_DIR.glob("*.xml")) + sorted(DATA_DIR.glob("*.txt")):
         if f.stem.startswith("_"):
             continue
         try:
@@ -615,15 +615,20 @@ def _run_alignment(anchor_id: str, threshold: float, top_k: int, tag_list: list)
     """Core alignment: anchor pass (for the matrix view) + all-pairs relations.
     Shared by the /api/align/run endpoint and startup restore, so a replay
     reproduces the exact same in-memory state."""
-    anchor_path = DATA_DIR / f"{anchor_id}.xml"
-    if not anchor_path.exists():
+    xml_path = DATA_DIR / f"{anchor_id}.xml"
+    txt_path = DATA_DIR / f"{anchor_id}.txt"
+
+    if xml_path.exists():
+        unit = "-".join(tag_list)  # "" keeps the original "{wid}:{pos}" seg_id scheme
+        anchor_lines = _load_lines_cached(xml_path, tags=tag_list)
+    elif txt_path.exists():
+        unit = ""
+        anchor_lines = _load_lines_cached(txt_path, tags=[])
+    else:
         raise HTTPException(404, f"Anchor {anchor_id} not found")
-
-    unit = "-".join(tag_list)  # "" keeps the original "{wid}:{pos}" seg_id scheme
-
-    anchor_lines = _load_lines_cached(anchor_path, tags=tag_list)
     if not anchor_lines:
         raise HTTPException(400, f"Anchor {anchor_id} has no readable segments")
+
     anchor_idx = _align.build_index(anchor_lines)
     anchor_sets = [Bundle(t) for (_n, t) in anchor_lines]  # built once, reused
 
@@ -634,7 +639,7 @@ def _run_alignment(anchor_id: str, threshold: float, top_k: int, tag_list: list)
     witnesses_stats = {}
     loaded_segments: dict = {}  # wid -> [(n, text), ...] in intrinsic pos order
 
-    for f in sorted(DATA_DIR.glob("*.xml")):
+    for f in sorted(DATA_DIR.glob("*.xml")) + sorted(DATA_DIR.glob("*.txt")):
         if f.stem.startswith("_"):
             continue
         wid = f.stem
@@ -939,4 +944,3 @@ def _restore_last_alignment():
 
 
 _restore_last_alignment()
-
