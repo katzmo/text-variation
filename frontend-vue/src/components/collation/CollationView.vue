@@ -519,10 +519,12 @@ async function pickSeg(si) {
 
 async function collate(si) {
   const wits = colOrder.value
-  const tokens = wits.map((w) => ({
-    id: w.id,
-    content: getSegText(w.id, si),
-  }))
+  const tokens = wits
+    .map((w) => ({
+      id: w.id,
+      content: getSegText(w.id, si),
+    }))
+    .filter((t) => t.content)
   let data = null
   try {
     data = await postCollate(tokens)
