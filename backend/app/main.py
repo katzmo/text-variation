@@ -29,11 +29,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel
 import httpx
+import collatex
 
 # ── paths ──────────────────────────────────────────────────────────
 DATA_DIR     = Path(os.getenv("DATA_DIR",     "/app/data/witnesses"))
 UPLOAD_DIR   = Path(os.getenv("UPLOAD_DIR",   "/app/data/uploads"))
-COLLATEX_URL = os.getenv("COLLATEX_URL", "http://collatex:7369/collatex/collate")
 TEI_NS       = "http://www.tei-c.org/ns/1.0"
 
 DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -223,24 +223,8 @@ async def collate(req: CollateRequest):
     if len(tokens) < 2:
         raise HTTPException(400, "Need at least 2 witnesses with this segment")
     payload = {"witnesses": tokens, "algorithm": "dekker", "joined": True}
-    try:
-        async with httpx.AsyncClient(timeout=30) as client:
-            r = await client.post(COLLATEX_URL, json=payload, headers={"Accept": "application/json"})
-            r.raise_for_status()
-            return r.json()
-    except Exception:
-        return _mock_alignment(tokens)
-
-def _mock_alignment(tokens):
-    all_words = [t["content"].split() for t in tokens]
-    max_len = max(len(w) for w in all_words)
-    table = []
-    for i in range(max_len):
-        row = {}
-        for j, t in enumerate(tokens):
-            row[t["id"]] = [{"t": all_words[j][i], "n": all_words[j][i].lower()}] if i < len(all_words[j]) else [{"t": "", "n": ""}]
-        table.append(row)
-    return {"table": table, "witnesses": [t["id"] for t in tokens]}
+    result = collatex.collate(payload, segmentation=False, output="json")
+    return Response(content=result, media_type="application/json")
 
 @app.get("/api/stemma")
 def get_stemma():

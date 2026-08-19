@@ -517,6 +517,16 @@ async function pickSeg(si) {
         segId,
         colOrder.value.map((w) => w.id),
       )
+      // reformat CollateX JSON output
+      const table = []
+      for (let i = 0; i < data.table[0].length; i++) {
+        const row = {}
+        data.witnesses.forEach((wid, idx) => {
+          row[wid] = data.table[idx][i]
+        })
+        table.push(row)
+      }
+      data.table = table
     } catch (e) {
       /* fall through */
     }
