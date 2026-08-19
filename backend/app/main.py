@@ -206,20 +206,11 @@ def get_matrix():
     return {"witnesses": wit_ids, "segments": all_seg_ids, "per_segment": per_segment, "overall": overall}
 
 class CollateRequest(BaseModel):
-    segment_id: str
-    witness_ids: Optional[list[str]] = None
+    tokens: list[dict]
 
 @app.post("/api/collate")
 async def collate(req: CollateRequest):
-    witnesses = []
-    for f in list_witness_files():
-        if f.stem.startswith("_"): continue
-        w = parse_witness(f) if f.suffix == ".xml" else parse_plain(f)
-        witnesses.append(w)
-    if req.witness_ids:
-        witnesses = [w for w in witnesses if w["id"] in req.witness_ids]
-    tokens = [{"id": w["id"], "content": w["segments"].get(req.segment_id, "")}
-              for w in witnesses if w["segments"].get(req.segment_id)]
+    tokens = getattr(req, "tokens", [])
     if len(tokens) < 2:
         raise HTTPException(400, "Need at least 2 witnesses with this segment")
     payload = {"witnesses": tokens, "algorithm": "dekker", "joined": True}

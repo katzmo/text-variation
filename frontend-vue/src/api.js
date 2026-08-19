@@ -12,11 +12,11 @@ export async function fetchSegments() {
   return r.json()
 }
 
-export async function postCollate(segmentId, witnessIds) {
+export async function postCollate(tokens) {
   const r = await fetch(`${API}/collate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ segment_id: segmentId, witness_ids: witnessIds }),
+    body: JSON.stringify({ tokens }),
   })
   if (!r.ok) throw new Error(`Collate failed: ${r.status}`)
   return r.json()

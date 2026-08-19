@@ -512,34 +512,43 @@ async function pickSeg(si) {
   // Skip backend call for mock segment IDs (no real witnesses uploaded yet)
   const isMockSegment = /^seg-\d+$/.test(segId)
   if (!isMockSegment) {
-    try {
-      data = await postCollate(
-        segId,
-        colOrder.value.map((w) => w.id),
-      )
-      // reformat CollateX JSON output
-      const table = []
-      for (let i = 0; i < data.table[0].length; i++) {
-        const row = {}
-        data.witnesses.forEach((wid, idx) => {
-          row[wid] = data.table[idx][i]
-        })
-        table.push(row)
-      }
-      data.table = table
-    } catch (e) {
-      /* fall through */
-    }
+    data = await collate(si)
   }
-  if (!data) data = mockCollate(si)
   rawGraphResult.value = data
 }
 
-function mockCollate(si) {
+async function collate(si) {
   const wits = colOrder.value
   const tokens = wits.map((w) => ({
     id: w.id,
-    words: getSegText(w.id, si).split(/\s+/).filter(Boolean),
+    content: getSegText(w.id, si),
+  }))
+  let data = null
+  try {
+    data = await postCollate(tokens)
+    // reformat CollateX JSON output
+    const table = []
+    for (let i = 0; i < data.table[0].length; i++) {
+      const row = {}
+      data.witnesses.forEach((wid, idx) => {
+        row[wid] = data.table[idx][i]
+      })
+      table.push(row)
+    }
+    data.table = table
+  } catch (e) {
+    console.log(e)
+    /* fall through */
+  }
+  if (!data) data = mockCollate(tokens)
+  return data
+}
+
+function mockCollate(segTexts) {
+  console.log('mocking collation')
+  const tokens = segTexts.map((w) => ({
+    id: w.id,
+    words: w.content.split(/\s+/).filter(Boolean),
   }))
   const maxLen = Math.max(...tokens.map((t) => t.words.length), 1)
   const table = []
