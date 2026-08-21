@@ -285,12 +285,25 @@ function drawGraph() {
       .on('mouseenter', function (event) {
         if (props.zoom === 0) {
           const [pointerX] = d3.pointer(event, g.node())
-          const bundle = getBundledWitnesses(nodes, xScale, props.data.length, translation, pointerX)
+          const bundle = getBundledWitnesses(
+            nodes,
+            xScale,
+            props.data.length,
+            translation,
+            pointerX,
+          )
           if (bundle.length > 1) {
-            tooltip.value = { x: event.clientX, y: event.clientY, text: `Bundled: ${bundle.join(', ')}` }
+            tooltip.value = {
+              x: event.clientX,
+              y: event.clientY,
+              text: `Bundled: ${bundle.join(', ')}`,
+            }
             edgeGroup.selectAll('path').attr('stroke-opacity', 0.3)
             bundle.forEach((t) => {
-              edgeGroup.select(`.path-${CSS.escape(t)}`).attr('stroke-opacity', 1).raise()
+              edgeGroup
+                .select(`.path-${CSS.escape(t)}`)
+                .attr('stroke-opacity', 1)
+                .raise()
             })
             return
           }
@@ -351,7 +364,9 @@ function drawGraph() {
         .on('mouseenter', function (event) {
           if (!nodeTooltip) return
           tooltip.value = { x: event.clientX, y: event.clientY, text: nodeTooltip }
-          d3.select(this).attr('fill', PILL_MERGED_HOVER_FILL).attr('stroke', PILL_MERGED_HOVER_STROKE)
+          d3.select(this)
+            .attr('fill', PILL_MERGED_HOVER_FILL)
+            .attr('stroke', PILL_MERGED_HOVER_STROKE)
         })
         .on('mouseleave', function () {
           if (!nodeTooltip) return
@@ -409,11 +424,9 @@ function applyHighlight() {
 // ── Watchers ──────────────────────────────────────────────────────────────────
 // zoom changes node y-positions (see buildPaths), so it needs a full redraw,
 // not just an attribute tweak.
-watch(
-  () => [props.data, props.translationOrder, props.zoom, props.showMerged],
-  drawGraph,
-  { deep: true },
-)
+watch(() => [props.data, props.translationOrder, props.zoom, props.showMerged], drawGraph, {
+  deep: true,
+})
 
 watch(() => [props.hoveredTranslation, props.selectedWitness], applyHighlight)
 

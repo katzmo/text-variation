@@ -161,12 +161,7 @@
             type="text"
             v-model="tags"
             placeholder="e.g. p,lg — blank = lines"
-            style="
-              width: 200px;
-              padding: 6px 8px;
-              font-size: 12px;
-              font-family: var(--mono);
-            "
+            style="width: 200px; padding: 6px 8px; font-size: 12px; font-family: var(--mono)"
           />
           <div class="align-thresh-desc">
             Comma-separated TEI tags to use as segments. Leave blank for line-level.
