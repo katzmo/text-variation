@@ -180,7 +180,6 @@ async function loadTexts() {
 
   // Update shared store
   witnesses.value = newWitnesses
-  selectedWit.value = newWitnesses[0]?.id || ''
 
   // Extract variants
   const wordFreq = {}

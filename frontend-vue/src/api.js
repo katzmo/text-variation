@@ -90,3 +90,9 @@ export async function fetchSegPairScore(segA, segB) {
   if (!r.ok) throw new Error('Score fetch failed')
   return r.json()
 }
+
+export async function fetchWitnessScores(witnessId) {
+  const r = await fetch(`${API}/align/witnesses/${witnessId}/scores`)
+  if (!r.ok) throw new Error(`Failed to fetch scores for ${witnessId}`)
+  return r.json()
+}

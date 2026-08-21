@@ -43,7 +43,7 @@
         <div class="col-minimap-inner">
           <div class="col-minimap-col" v-for="w in visibleCols" :key="w.id">
             <div
-              v-for="si in minimapRows"
+              v-for="si in alignScores ? alignScores[w.id].keys() : []"
               :key="si"
               class="col-minimap-seg"
               :style="{ background: segColor(w.id, si) }"
@@ -93,9 +93,9 @@
             </div>
             <div class="col-segs">
               <div
-                v-for="(s, si) in segs"
+                v-for="(s, si) in alignScores ? alignScores[w.id] : segs"
                 :key="si"
-                :data-id="getSegId(w.id, si)"
+                :data-id="s.seg_id ?? getSegId(w.id, si)"
                 class="col-seg"
                 :class="{ active: activeSeg === si, highlighted: isHighlighted(w.id, si) }"
                 :style="{
@@ -103,9 +103,9 @@
                   width: cw - 8 + 'px',
                   background: segColor(w.id, si),
                 }"
-                @click="pickSeg(si)"
+                @click="pickSeg(s.seg_id ?? getSegId(w.id, si))"
               >
-                <div class="col-seg-text">{{ getSegText(w.id, si) }}</div>
+                <div class="col-seg-text">{{ s.text ?? getSegText(w.id, si) }}</div>
               </div>
             </div>
           </div>
@@ -215,8 +215,9 @@ const {
   selectedWit,
   selectedVariant,
   getSegText: storeGetSegText,
-  alignMatrix,
+  alignScores,
   getAlignScore,
+  getAlignedSegs,
   getSegId,
 } = useStore()
 
@@ -306,7 +307,7 @@ function normText(t) {
 function simScore(id, si) {
   // When a real alignment matrix is loaded, the cell colour is the text
   // similarity of that witness's aligned line to the anchor line (0 = gap).
-  if (alignMatrix.value) {
+  if (alignScores.value) {
     const sc = getAlignScore(id, si)
     return sc == null ? 0 : sc
   }
@@ -326,7 +327,7 @@ function simScore(id, si) {
 function segColor(id, si) {
   const score = simScore(id, si)
   // Gaps (no aligned line) render as a very light, neutral cell
-  if (alignMatrix.value && getAlignScore(id, si) === 0) {
+  if (score === 0) {
     return 'hsl(40,15%,93%)'
   }
   if (settings.value.colorMode === 'position' && settings.value.ref) {
@@ -464,15 +465,19 @@ function drawDendro() {
 
 // ── Wave ─────────────────────────────────────────────────────────────────────
 function drawWave() {
-  const si = activeSeg.value
-  if (si === null) return
+  const segId = activeSeg.value
+  if (!segId) return
+  const alignedSegs = getAlignedSegs(segId)
   const cols = visibleCols.value
-  const segY = BADGE_H + si * (sh.value + 2) + sh.value / 2
   const amp = Math.max(8, Math.min(30, sh.value * 1.2))
-  const pts = cols.map((w, i) => [
-    8 + i * cw.value + cw.value / 2,
-    segY + (1 - simScore(w.id, si)) * amp,
-  ])
+  const pts = cols.map((w, i) => {
+    const si = alignedSegs[w.id] ?? -1
+    const score = si === -1 ? 0 : simScore(w.id, si)
+    return [
+      8 + i * cw.value + cw.value / 2,
+      BADGE_H + si * (sh.value + 2) + sh.value / 2 + (1 - score) * amp,
+    ]
+  })
   if (pts.length < 2) {
     wavePath.value = null
     return
@@ -503,26 +508,21 @@ function toGraphData(data) {
 }
 const graphData = computed(() => toGraphData(rawGraphResult.value))
 
-async function pickSeg(si) {
-  activeSeg.value = si
+async function pickSeg(segId) {
+  activeSeg.value = segId
   drawWave()
-  const segId = segs.value[si]
-  if (!segId) return
   let data = null
-  // Skip backend call for mock segment IDs (no real witnesses uploaded yet)
-  const isMockSegment = /^seg-\d+$/.test(segId)
-  if (!isMockSegment) {
-    data = await collate(si)
-  }
+  data = await collate(segId)
   rawGraphResult.value = data
 }
 
-async function collate(si) {
+async function collate(segId) {
   const wits = colOrder.value
+  const alignedSegs = getAlignedSegs(segId)
   const tokens = wits
     .map((w) => ({
       id: w.id,
-      content: getSegText(w.id, si),
+      content: alignedSegs[w.id] ? getSegText(w.id, alignedSegs[w.id]) : '',
     }))
     .filter((t) => t.content)
   let data = null
@@ -617,8 +617,8 @@ function applySort(mode) {
     case 'similarity':
       colOrder.value = all.sort(
         (a, b) =>
-          segs.value.reduce((s, _, si) => s + simScore(b.id, si), 0) -
-          segs.value.reduce((s, _, si) => s + simScore(a.id, si), 0),
+          alignScores.value[b.id].reduce((s, _, si) => s + simScore(b.id, si), 0) -
+          alignScores.value[a.id].reduce((s, _, si) => s + simScore(a.id, si), 0),
       )
       break
     case 'relationships': {
@@ -661,7 +661,7 @@ watch(
 watch(
   witnesses,
   () => {
-    if (alignMatrix.value) return // matrix watcher owns layout when real data is present
+    if (alignScores.value) return // scores watcher owns layout when real data is present
     const ids = witnesses.value.map((w) => w.id)
     tree.value = upgma(ids, storeGetSegText)
     const order = leafOrder(tree.value)
@@ -671,18 +671,18 @@ watch(
   { deep: true },
 )
 
-// When a real alignment matrix arrives, rebuild rows (anchor lines) and columns
+// When real alignment scores arrive, rebuild columns
 watch(
-  alignMatrix,
-  (m) => {
-    if (!m) return
-    // Rows = one per anchor line
-    segs.value = m.anchor_lines.map((_l, i) => `row-${i}`)
+  alignScores,
+  (s) => {
+    if (!s) return
+    // Rows = one per segment of the longest witness
+    const nRows = Object.values(s).reduce((max, current) => Math.max(max.length, current.length))
+    segs.value = Array.from({ length: nRows }, (_l, i) => `row-${i}`)
     // Columns = witnesses from the matrix; default order is a UPGMA tree on real scores.
     // Sample ~24 rows spread across the whole anchor range (not just the top 8),
     // because most witnesses only align further down, so the first rows are mostly gaps.
-    const ids = m.witnesses
-    const nRows = m.anchor_lines.length
+    const ids = Object.keys(s)
     const nSamples = Math.min(24, nRows)
     const sampleIdx =
       nRows <= nSamples
@@ -691,7 +691,7 @@ watch(
     tree.value = upgma(
       ids,
       (id, si) => {
-        const cell = m.cells[id] ? m.cells[id][si] : null
+        const cell = s[id] ? s[id][si] : null
         return cell ? cell.text : ''
       },
       sampleIdx,
@@ -704,11 +704,6 @@ watch(
       return { id, name: w ? w.name : id }
     }
     colOrder.value = order.map(byId).filter(Boolean)
-    // Anchor first if present
-    const anchor = colOrder.value.find((w) => w.id === m.anchor_id)
-    if (anchor) {
-      colOrder.value = [anchor, ...colOrder.value.filter((w) => w.id !== m.anchor_id)]
-    }
     activeSeg.value = null
     wavePath.value = null
     setTimeout(drawDendro, 30)
@@ -718,7 +713,7 @@ watch(
 
 // ── Mount ────────────────────────────────────────────────────────────────────
 onMounted(() => {
-  if (alignMatrix.value) return // matrix watcher will set up layout
+  if (alignScores.value) return // scores watcher will set up layout
   const ids = witnesses.value.map((w) => w.id)
   tree.value = upgma(ids, storeGetSegText)
   const order = leafOrder(tree.value)

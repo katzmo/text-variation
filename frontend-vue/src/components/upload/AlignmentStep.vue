@@ -265,9 +265,10 @@ import {
   fetchInspectAlignment,
   postSaveAlignment,
   fetchAlignMatrix,
+  fetchWitnessScores,
 } from '../../api.js'
 
-const { witnesses, alignMatrix } = useStore()
+const { witnesses, alignScores } = useStore()
 const running = ref(false)
 const status = ref('')
 const witList = ref([])
@@ -316,7 +317,15 @@ async function runAlignment() {
     // Pull the anchor-indexed grid into the store so the collation heatmap uses real data
     status.value = 'Loading alignment grid…'
     try {
-      alignMatrix.value = await fetchAlignMatrix(400)
+      await fetchAlignMatrix(400) // calculates scores in the backend
+      const scores = {}
+      await Promise.all(
+        witList.value.map(async (w) => {
+          const result = await fetchWitnessScores(w.id)
+          scores[w.id] = result.segments
+        }),
+      )
+      alignScores.value = scores
     } catch (e) {
       /* heatmap stays on fallback */
     }
