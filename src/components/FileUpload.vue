@@ -5,6 +5,8 @@ import { useIndexedDBStore } from '@/composables/db'
 
 const emit = defineEmits(['documents-updated'])
 
+const message = ref()
+
 const { documents, dbExec } = useIndexedDBStore()
 
 // File dialog for browsing
@@ -42,12 +44,17 @@ const processFiles = async (fileList) => {
   await Promise.all(
     Array.from(fileList).map(async (file) => {
       const content = await readFileAsText(file)
-      await dbExec('documents', 'add', {
+      const doc = {
         id: file.name.split('.', 1)[0],
         name: file.name,
         size: file.size,
         content,
-      })
+      }
+      parseXML(doc)
+      doc.key = await dbExec('documents', 'add', doc)
+      if (!doc.key) {
+        message.value = `Error uploading ${file.name}: ${doc.id} already exists.`
+      }
     }),
   )
   emit('documents-updated', documents.value)
@@ -65,6 +72,20 @@ const readFileAsText = (file) => {
     reader.onload = (e) => resolve(e.target.result)
     reader.readAsText(file)
   })
+}
+
+/**
+ * Process uploaded TEI files before saving them.
+ *
+ * @param {object} doc - A document object with XML content.
+ * @returns {Document} - The parsed XML document.
+ */
+const parseXML = (doc) => {
+  const parser = new DOMParser()
+  const xml = parser.parseFromString(doc.content, 'text/xml')
+  // Read document ID.
+  doc.id = xml.documentElement.getAttribute('xml:id') ?? doc.id
+  return xml
 }
 
 /**
@@ -94,7 +115,7 @@ const clearFiles = async () => {
       <p>Drag & drop TEI files here or click to upload</p>
       <button @click="openFileDialog" class="button">Upload Files</button>
     </div>
-
+    <div v-if="message" class="error message">{{ message }}</div>
     <div v-if="documents.length > 0" class="file-list">
       <button @click="clearFiles" class="clear">Clear All</button>
       <h3>Uploaded Files:</h3>
@@ -128,6 +149,11 @@ const clearFiles = async () => {
 .file-item {
   padding: 0.5rem;
   border-bottom: 1px solid var(--color-border);
+}
+
+.error {
+  color: #ff4444;
+  font-weight: bold;
 }
 
 button.remove,
