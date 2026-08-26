@@ -7,7 +7,7 @@ const emit = defineEmits(['documents-updated'])
 
 const message = ref()
 
-const { documents, dbExec } = useIndexedDBStore()
+const { documents, db, dbExec } = useIndexedDBStore()
 
 // File dialog for browsing
 const {
@@ -55,7 +55,9 @@ const processFiles = async (fileList) => {
       doc.key = await dbExec('documents', 'add', doc)
       if (!doc.key) {
         message.value = `Error uploading ${file.name}: ${doc.id} already exists.`
+        return
       }
+      saveSegments(xml, doc)
     }),
   )
   emit('documents-updated', documents.value)
@@ -105,6 +107,44 @@ const segmentXML = (xml, doc, segmentSelector = 'head, p, lg, list') => {
   }
   // Serialize back to XML string.
   doc.content = new XMLSerializer().serializeToString(xml)
+}
+
+/**
+ * Save segments with an ID from XML.
+ *
+ * @param {Document} xml - Parsed XML document.
+ * @param {object} doc - The document object related to the XML.
+ */
+const saveSegments = async (xml, doc) => {
+  const segments = xml.querySelectorAll('[data-id]')
+  for (const [index, seg] of segments.entries()) {
+    const segId = seg.getAttribute('data-id')
+    const data = await db.getFromIndex('segments', 'id', segId)
+    if (data) break // assuming all segments have already been saved to the DB
+    await dbExec('segments', 'add', {
+      docKey: doc.key,
+      id: segId,
+      pos: index + 1,
+      content: getTextContent(seg),
+    })
+  }
+}
+
+/**
+ * Extract text content from an element, skipping specified selectors.
+ *
+ * @param {Element} segment - The DOM element to extract text from.
+ * @param {string} [excludedSelector] - Selector for elements to exclude.
+ *   Defaults to 'note, del, [rend~="strikethrough"], [rend~="linethrough"],
+ *   [hidden], sic + corr, abbr + expan, orig + reg, span.reason'.
+ * @returns {string} - The extracted text.
+ */
+const getTextContent = (segment, excludedSelector) => {
+  excludedSelector ??=
+    'note, del, [rend~="strikethrough"], [rend~="linethrough"], [hidden], sic + corr, abbr + expan, orig + reg, span.reason'
+  const filteredSeg = segment.cloneNode(true)
+  filteredSeg.querySelectorAll(excludedSelector).forEach((ex) => ex.remove())
+  return filteredSeg.textContent.replace(/\s+/g, ' ')
 }
 
 /**
