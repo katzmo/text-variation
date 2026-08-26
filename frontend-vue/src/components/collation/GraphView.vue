@@ -45,9 +45,8 @@ const MARGIN = { top: 40, right: 120, bottom: 20, left: 20 }
 const INNER_H = HEIGHT - MARGIN.top - MARGIN.bottom
 const PILL_WIDTH = 14
 const LANE_HEIGHT = 6
+const LANE_SPACING = 60
 const PILL_FILL = '#e8e8e8'
-// Amber highlight on hover for nodes with more than one merged-away reading,
-// matching the amber used for highlighted collation cells elsewhere in the app.
 const PILL_MERGED_HOVER_FILL = '#f5dfa0'
 const PILL_MERGED_HOVER_STROKE = '#c8860a'
 
@@ -112,10 +111,14 @@ function computeNodePositions(data, translationOrder) {
     .domain(data.map((_, i) => i.toString()))
     .range([0, innerW])
 
+  const maxGroups = Math.max(1, ...data.map((p) => p.groups.length))
+  const spreadH = Math.min(INNER_H, Math.max(maxGroups - 1, 1) * LANE_SPACING)
+  const spreadOffset = (INNER_H - spreadH) / 2
+
   const translationY = (t) => {
     const idx = translationOrder.indexOf(t)
     const total = translationOrder.length
-    return (idx / Math.max(total - 1, 1)) * INNER_H
+    return spreadOffset + (idx / Math.max(total - 1, 1)) * spreadH
   }
 
   const previousTranslationY = new Map()
