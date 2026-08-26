@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { useCETEI } from '@/composables/cetei'
 
 const props = defineProps({
+  name: String,
   xmlString: String,
 })
 
@@ -13,7 +14,9 @@ appendXmlString(display, props.xmlString)
 </script>
 
 <template>
-  <div class="text-sequence" ref="display"></div>
+  <div class="text-sequence" ref="display">
+    <div class="identifier">{{ name }}</div>
+  </div>
 </template>
 
 <style>

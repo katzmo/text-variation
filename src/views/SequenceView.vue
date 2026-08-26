@@ -48,6 +48,7 @@ watchDebounced(
     <TextSequence
       v-for="doc in documents"
       :key="doc.key + doc.content.length.toString()"
+      :name="doc.id"
       :xmlString="doc.content"
     ></TextSequence>
   </div>
