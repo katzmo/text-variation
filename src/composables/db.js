@@ -2,7 +2,7 @@ import { openDB } from 'idb'
 import { onMounted, ref } from 'vue'
 
 const dbName = 'TextTool'
-const storeNames = ['documents']
+const storeNames = ['documents', 'segments']
 const stores = Object.fromEntries(storeNames.map((key) => [key, ref([])]))
 let db = null
 
@@ -31,6 +31,10 @@ export const useIndexedDBStore = () => {
           if (!db.objectStoreNames.contains(storeName)) {
             const store = db.createObjectStore(storeName, { keyPath: 'key', autoIncrement: true })
             store.createIndex('id', 'id', { unique: true })
+
+            if (storeName !== 'documents') {
+              store.createIndex('docKey', 'docKey') // index releated document
+            }
           }
         }
       },
@@ -67,6 +71,7 @@ export const useIndexedDBStore = () => {
 
   return {
     ...stores,
+    db,
     dbExec,
   }
 }
