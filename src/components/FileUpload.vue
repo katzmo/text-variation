@@ -50,7 +50,8 @@ const processFiles = async (fileList) => {
         size: file.size,
         content,
       }
-      parseXML(doc)
+      const xml = parseXML(doc)
+      segmentXML(xml, doc)
       doc.key = await dbExec('documents', 'add', doc)
       if (!doc.key) {
         message.value = `Error uploading ${file.name}: ${doc.id} already exists.`
@@ -86,6 +87,24 @@ const parseXML = (doc) => {
   // Read document ID.
   doc.id = xml.documentElement.getAttribute('xml:id') ?? doc.id
   return xml
+}
+
+/**
+ * Find segments in XML.
+ *
+ * @param {Document} xml - Parsed XML document.
+ * @param {object} doc - The document object related to the XML.
+ * @param {string} [segmentSelector='head, p, lg, list'] - Selector for identifying segments.
+ */
+const segmentXML = (xml, doc, segmentSelector = 'head, p, lg, list') => {
+  const segments = xml.querySelector('body').querySelectorAll(segmentSelector)
+  if (segments[0].hasAttribute('data-id')) return // Segments have already been parsed.
+  for (const [index, seg] of segments.entries()) {
+    let segId = `${doc.id}:${seg.tagName}:${index + 1}`
+    seg.setAttribute('data-id', segId)
+  }
+  // Serialize back to XML string.
+  doc.content = new XMLSerializer().serializeToString(xml)
 }
 
 /**
