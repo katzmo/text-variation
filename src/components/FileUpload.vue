@@ -110,9 +110,9 @@ const segmentXML = (xml, doc, segmentSelector = 'head, p, lg, list') => {
 }
 
 /**
- * Save segments with an ID from XML.
+ * Save the text and tokens of each segment to the DB.
  *
- * @param {Document} xml - Parsed XML document.
+ * @param {Document} xml - Parsed XML document with data-ids.
  * @param {object} doc - The document object related to the XML.
  */
 const saveSegments = async (xml, doc) => {
@@ -121,12 +121,23 @@ const saveSegments = async (xml, doc) => {
     const segId = seg.getAttribute('data-id')
     const data = await db.getFromIndex('segments', 'id', segId)
     if (data) break // assuming all segments have already been saved to the DB
-    await dbExec('segments', 'add', {
+    const content = getTextContent(seg)
+    const segKey = await dbExec('segments', 'add', {
       docKey: doc.key,
       id: segId,
       pos: index + 1,
-      content: getTextContent(seg),
+      content,
     })
+    const tokens = new Set(content.match(/\w+/g).map(t => t.toLowerCase()))
+    for (const token of tokens) {
+      const saved = await db.getFromIndex('tokens', 'idByDoc', [token, doc.key])
+      if (saved) {
+        saved.segKeys.push(segKey)
+        await dbExec('tokens', 'put', saved)
+      } else {
+        await dbExec('tokens', 'add', { id: token, docKey: doc.key, segKeys: [segKey] })
+      }
+    }
   }
 }
 
