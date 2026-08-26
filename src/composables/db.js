@@ -52,6 +52,16 @@ export const useIndexedDBStore = () => {
     try {
       db = await initDB()
       const resolved = await db[action](storeName, ...args)
+      // Cascade deletions
+      if (action === 'delete' && storeName === 'documents') {
+        cascadeDelete('docKey', args[0])
+      }
+      // Cascade clear
+      else if (action === 'clear' && storeName === 'documents') {
+        await Promise.all(
+          storeNames.filter((name) => name !== 'documents').map((name) => dbExec(name, action)),
+        )
+      }
       // Update data after changes
       if (['put', 'add', 'delete', 'clear'].includes(action)) {
         stores[storeName].value = await dbExec(storeName, 'getAll')
@@ -60,6 +70,27 @@ export const useIndexedDBStore = () => {
     } catch (err) {
       console.warn(err)
     }
+  }
+
+  /**
+   * Delete objects from all stores with a certain index.
+   *
+   * @param {string} indexName - The index to query.
+   * @param {*} value - The value to delete.
+   */
+  const cascadeDelete = async (indexName, value) => {
+    storeNames.forEach(async (storeName) => {
+      let keys = []
+      try {
+        keys = await db.getAllKeysFromIndex(storeName, indexName, value)
+      } catch (err) {
+        if (err.name === 'NotFoundError') return
+        throw err
+      }
+      await Promise.all(keys.map((key) => db.delete(storeName, key)))
+      // Upadate reference
+      stores[storeName].value = await dbExec(storeName, 'getAll')
+    })
   }
 
   onMounted(async () => {
