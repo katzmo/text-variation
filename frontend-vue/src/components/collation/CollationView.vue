@@ -508,12 +508,7 @@ async function pickSeg(si) {
   drawWave()
   const segId = segs.value[si]
   if (!segId) return
-  let data = null
-  // Skip backend call for mock segment IDs (no real witnesses uploaded yet)
-  const isMockSegment = /^seg-\d+$/.test(segId)
-  if (!isMockSegment) {
-    data = await collate(si)
-  }
+  let data = await collate(si)
   rawGraphResult.value = data
 }
 
