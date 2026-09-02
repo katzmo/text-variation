@@ -2,6 +2,7 @@
 import { ref, watch } from 'vue'
 import { useFileDialog, useDropZone } from '@vueuse/core'
 import { useIndexedDBStore } from '@/composables/db'
+import { useAlignmentProcessor } from '@/composables/processAlignment'
 import { useDocumentProcessor } from '@/composables/processDocument'
 
 const emit = defineEmits(['documents-updated'])
@@ -10,6 +11,7 @@ const message = ref()
 
 const { documents, dbExec } = useIndexedDBStore()
 const { parseXML, segmentXML, saveSegments } = useDocumentProcessor()
+const { alignSegments } = useAlignmentProcessor()
 
 // File dialog for browsing
 const {
@@ -59,10 +61,11 @@ const processFiles = async (fileList) => {
         message.value = `Error uploading ${file.name}: ${doc.id} already exists.`
         return
       }
-      saveSegments(xml, doc)
+      await saveSegments(xml, doc)
     }),
   )
   emit('documents-updated', documents.value)
+  await alignSegments()
 }
 
 /**
