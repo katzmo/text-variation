@@ -15,11 +15,13 @@ export function useAlignmentProcessor() {
    */
   const alignSegments = async (options = {}) => {
     const docKeys = await dbExec('documents', 'getAllKeys')
-    await Promise.all(
+    const candidates = await Promise.all(
       docKeys.flatMap((doc1, i) =>
         docKeys.slice(i + 1).map(async (doc2) => alignPair(doc1, doc2, options)),
       ),
     )
+    const sorted = candidates.flat().sort((a, b) => b[2] - a[2])
+    await saveGroups(sorted)
   }
 
   /**
@@ -37,9 +39,7 @@ export function useAlignmentProcessor() {
     // Find matching segments in the documents
     const candidates = await findCandidates(docKey1, docKey2)
     // Process and filter candidates
-    const filteredScores = filterTopCandidates(candidates, options.topK)
-    // Store the best matches
-    await saveTopScores(filteredScores, [docKey1, docKey2])
+    return filterTopCandidates(candidates, options.topK)
   }
 
   /**
@@ -50,16 +50,17 @@ export function useAlignmentProcessor() {
    * @returns {Object} Candidate pairs with shared token counts.
    */
   const findCandidates = async (docKey1, docKey2) => {
-    const candidates = {}
+    const candidates = { [docKey1]: {} }
     const store = db.transaction('tokens', 'readonly').store
     for await (const cursor of store.index('docKey').iterate(docKey1)) {
       const token1 = cursor.value
       const token2 = await store.index('idByDoc').get([token1.id, docKey2])
       if (token2) {
         for (const segKey1 of token1.segKeys) {
-          candidates[segKey1] ??= {}
+          candidates[docKey1][segKey1] ??= { [docKey2]: {} }
           for (const segKey2 of token2.segKeys) {
-            candidates[segKey1][segKey2] = (candidates[segKey1][segKey2] ?? 0) + 1
+            candidates[docKey1][segKey1][docKey2][segKey2] ??= 0
+            candidates[docKey1][segKey1][docKey2][segKey2] += 1
           }
         }
       }
@@ -72,52 +73,99 @@ export function useAlignmentProcessor() {
    *
    * @param {Object} candidates - Candidate pairs with counts.
    * @param {number} [topK=10] - Number of top candidates per segment.
-   * @returns {Array} Array of [segKey1, segKey2, score] tuples.
+   * @returns {Array} Array of [[docKey1, segKey1], [docKey2, segKey2], score] tuples.
    */
   const filterTopCandidates = (candidates, topK = 10) => {
     const scores = []
-    for (const [segKey1, candidates2] of Object.entries(candidates)) {
-      Object.entries(candidates2)
-        .sort((a, b) => b[1] - a[1]) // sorts by count descending
-        .slice(0, topK) // keeps only the top k candidates
-        .forEach(([segKey2, value]) => {
-          scores.push([segKey1, segKey2, value])
-        })
+    // Flatten nested objects.
+    for (const [docKey1, segments1] of Object.entries(candidates)) {
+      for (const [segKey1, candidates2] of Object.entries(segments1)) {
+        for (const [docKey2, segments2] of Object.entries(candidates2)) {
+          Object.entries(segments2)
+            .sort((a, b) => b[1] - a[1]) // sorts by count descending
+            .slice(0, topK) // keeps only the top k candidates
+            .forEach(([segKey2, value]) => {
+              scores.push([[docKey1, segKey1], [docKey2, segKey2], value])
+            })
+        }
+      }
     }
     return scores
   }
 
   /**
-   * Stores the best available alignments in the database.
+   * Greedily sort related alignments into groups and store them.
    *
-   * @param {Array} scores - Array of [segKey1, segKey2, score] tuples.
-   * @param {Array} docKeys - Tuple of the 2 related document keys.
+   * @param {Array} scores - Array of candidate tuples, sorted by score.
+   *   Expected format: [[docKey1, segKey1], [docKey2, segKey2], score]
    */
-  const saveTopScores = async (scores, docKeys) => {
-    const tx = db.transaction('scores', 'readwrite')
+  const saveGroups = async (scores) => {
+    let tx = db.transaction('scores', 'readwrite')
+
     // Keep track of already aligned segments.
-    const aligned = [new Set(), new Set()]
-    // Sort by scores descending.
-    scores.sort((a, b) => b[2] - a[2])
+    const groupedSegs = new Map()
+    const addToGroup = (group, docKey, segKey) => {
+      group.documents.add(docKey)
+      group.segments.add(segKey)
+      groupedSegs.set(segKey, group)
+    }
+
     // Pick the best available pairing for unaligned segments.
-    for (const [segKey1, segKey2, score] of scores) {
-      if (!aligned[0].has(segKey1) && !aligned[1].has(segKey2)) {
-        tx.store.add({
-          docKeys: docKeys,
-          segKeys: [segKey1, segKey2].sort(),
-          score,
+    for (const [[docKey1, segKey1], [docKey2, segKey2], score] of scores) {
+      const group1 = groupedSegs.get(segKey1)
+      const group2 = groupedSegs.get(segKey2)
+      // Discard this pair if a segment from the same document has already been aligned.
+      if (group1?.documents.has(docKey2) || group2?.documents.has(docKey1)) continue
+      // Try to add the pair to a group.
+      if (!group1 && !group2) {
+        const newGroup = { id: generateId(), documents: new Set(), segments: new Set() }
+        addToGroup(newGroup, docKey1, segKey1)
+        addToGroup(newGroup, docKey2, segKey2)
+      } else if (group1 && !group2) {
+        addToGroup(group1, docKey2, segKey2)
+      } else if (!group1 && group2) {
+        addToGroup(group2, docKey1, segKey1)
+      } else if (group1 !== group2) {
+        // Merge if no segments are from the same document.
+        if (group1.documents.intersection(group2.documents).size) continue
+        const segArray = [...group2.segments]
+        Array.from(group2.documents).forEach((docKey, i) => {
+          addToGroup(group1, docKey, segArray[i])
         })
-        aligned[0].add(segKey1)
-        aligned[1].add(segKey2)
       }
+      // Pair was added to a group -> save score.
+      tx.store.add({
+        docKeys: [docKey1, docKey2].sort(),
+        segKeys: [segKey1, segKey2].sort(),
+        score,
+      })
     }
     await tx.done
+
+    // Save groups.
+    const groups = new Set(groupedSegs.values())
+    tx = db.transaction('groups', 'readwrite')
+    groups.forEach(({ id, segments }) => {
+      tx.store.add({ id, segKeys: [...segments].sort() })
+    })
+  }
+
+  /**
+   * Generate a short random string.
+   *
+   * @param {int} [length=8] - The length of the output.
+   * @returns {string} - A random base36 string.
+   */
+  const generateId = (length = 8) => {
+    return Math.random()
+      .toString(36)
+      .substring(2, length + 2)
   }
 
   return {
     alignSegments,
     alignPair,
     filterTopCandidates,
-    saveTopScores,
+    saveGroups,
   }
 }
