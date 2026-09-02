@@ -2,7 +2,7 @@ import { openDB } from 'idb'
 import { onMounted, ref } from 'vue'
 
 const dbName = 'TextTool'
-const storeNames = ['documents', 'scores', 'segments', 'tokens']
+const storeNames = ['documents', 'groups', 'scores', 'segments', 'tokens']
 const stores = Object.fromEntries(storeNames.map((key) => [key, ref([])]))
 let db = null
 
@@ -33,11 +33,14 @@ export const useIndexedDBStore = () => {
             if (['documents', 'segments'].includes(storeName)) {
               store.createIndex('id', 'id', { unique: true })
             }
-            if (['segments', 'tokens'].includes(storeName)) {
+            if (['groups', 'segments', 'tokens'].includes(storeName)) {
               store.createIndex('docKey', 'docKey') // index releated document
             }
-            if ('tokens' === storeName) {
-              store.createIndex('idByDoc', ['id', 'docKey'], { unique: true }) // index tokens by document
+            if (['groups', 'tokens'].includes(storeName)) {
+              store.createIndex('idByDoc', ['id', 'docKey'], { unique: true }) // index by document
+            }
+            if ('groups' === storeName) {
+              store.createIndex('segKey', 'segKey', { unique: true })
             }
             if ('scores' === storeName) {
               store.createIndex('docKeys', 'docKeys') // combined value
