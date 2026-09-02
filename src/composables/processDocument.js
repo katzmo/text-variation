@@ -62,9 +62,11 @@ export function useDocumentProcessor() {
    *
    * @param {Document} xml - Parsed XML document with data-ids.
    * @param {object} doc - The document object related to the XML.
+   * @returns {Promise<void>} - Resolves when everything has been saved.
    */
   const saveSegments = async (xml, doc) => {
     const segments = xml.querySelectorAll('[data-id]')
+    const tokens = {}
     for (const [index, seg] of segments.entries()) {
       const segId = seg.getAttribute('data-id')
       const data = await db.getFromIndex('segments', 'id', segId)
@@ -77,15 +79,15 @@ export function useDocumentProcessor() {
         content,
       })
       for (const token of tokenize(content)) {
-        const saved = await db.getFromIndex('tokens', 'idByDoc', [token, doc.key])
-        if (saved) {
-          saved.segKeys.push(segKey)
-          await dbExec('tokens', 'put', saved)
-        } else {
-          await dbExec('tokens', 'add', { id: token, docKey: doc.key, segKeys: [segKey] })
-        }
+        tokens[token] ??= []
+        tokens[token].push(segKey)
       }
     }
+    const tx = db.transaction('tokens', 'readwrite')
+    await Promise.all(
+      Object.entries(tokens).map(([id, segKeys]) => tx.store.add({ id, segKeys, docKey: doc.key })),
+    )
+    return tx.done
   }
 
   return {
