@@ -31,6 +31,10 @@ export function useDocumentProcessor() {
    */
   const segmentXML = (xml, doc, segmentSelector = 'head, p, lg, list') => {
     const segments = xml.querySelector('body').querySelectorAll(segmentSelector)
+    if (!segments.length) {
+      console.warn(`Found no segments "${segmentSelector}" in`, doc)
+      return
+    }
     if (segments[0].hasAttribute('data-id')) return // Segments have already been parsed.
     for (const [index, seg] of segments.entries()) {
       let segId = `${doc.id}:${seg.tagName}:${index + 1}`
@@ -67,10 +71,13 @@ export function useDocumentProcessor() {
   const saveSegments = async (xml, doc) => {
     const segments = xml.querySelectorAll('[data-id]')
     const tokens = {}
+    if (
+      !segments.length ||
+      (await db.getFromIndex('segments', 'id', segments[0].getAttribute('data-id')))
+    )
+      return // assuming all segments have already been saved to the DB
     for (const [index, seg] of segments.entries()) {
       const segId = seg.getAttribute('data-id')
-      const data = await db.getFromIndex('segments', 'id', segId)
-      if (data) break // assuming all segments have already been saved to the DB
       const content = getTextContent(seg)
       const segKey = await dbExec('segments', 'add', {
         docKey: doc.key,
