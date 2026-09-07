@@ -4,13 +4,15 @@ import { useFileDialog, useDropZone } from '@vueuse/core'
 import { useIndexedDBStore } from '@/composables/db'
 import { useAlignmentProcessor } from '@/composables/processAlignment'
 import { useDocumentProcessor } from '@/composables/processDocument'
+import IconWaiting from './icons/IconWaiting.vue'
 
-const emit = defineEmits(['documents-updated'])
+const emit = defineEmits(['close-modal', 'documents-updated'])
 
 const message = ref()
+const isProcessing = ref(false)
 
 const { documents, dbExec } = useIndexedDBStore()
-const { parseXML, segmentXML, saveSegments } = useDocumentProcessor()
+const { parseXML, segmentXML, applyGroups, saveSegments } = useDocumentProcessor()
 const { alignSegments } = useAlignmentProcessor()
 
 // File dialog for browsing
@@ -44,8 +46,8 @@ watch(selectedFiles, (newFiles) => {
  * @returns {Promise<void>} - Promise that esolves when all files have been processed.
  * @emits documents-updated
  */
-// Process files (from dialog or drop)
 const processFiles = async (fileList) => {
+  isProcessing.value = true
   await Promise.all(
     Array.from(fileList).map(async (file) => {
       const content = await readFileAsText(file)
@@ -65,8 +67,8 @@ const processFiles = async (fileList) => {
       await saveSegments(xml, doc)
     }),
   )
+  isProcessing.value = false
   emit('documents-updated', documents.value)
-  await alignSegments()
 }
 
 /**
@@ -105,6 +107,26 @@ const clearFiles = async () => {
   await dbExec('documents', 'clear')
   emit('documents-updated', documents.value)
 }
+
+/**
+ * Save matching segment groups and scores.
+ *
+ * @returns {Promise<void>} - Resolves when groups and scores have been saved.
+ * @emits close-modal
+ */
+const runAlignment = async () => {
+  isProcessing.value = true
+  await alignSegments()
+  await Promise.all(
+    documents.value.map(async (doc) => {
+      const xml = parseXML(doc)
+      await applyGroups(xml, doc)
+      return await dbExec('documents', 'put', { ...doc })
+    }),
+  )
+  isProcessing.value = false
+  emit('close-modal')
+}
 </script>
 
 <template>
@@ -126,6 +148,12 @@ const clearFiles = async () => {
         </li>
       </ul>
     </div>
+  </div>
+  <button v-if="documents.length > 0" @click="runAlignment" :disabled="isProcessing">
+    Run alignment
+  </button>
+  <div class="processing" v-if="isProcessing">
+    <IconWaiting width="4em" aria-label="Processing documents." />
   </div>
 </template>
 
@@ -172,5 +200,10 @@ button.remove {
   font-size: 1.5em;
   padding: 0em 0.5em;
   margin-top: -0.33rem;
+}
+
+.processing {
+  display: flex;
+  justify-content: center;
 }
 </style>

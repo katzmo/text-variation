@@ -15,8 +15,7 @@ const isModalOpen = ref(false)
   <p><button @click="isModalOpen = true">Manage data</button></p>
   <Modal v-model="isModalOpen">
     <h2>Manage data</h2>
-    <FileUploader />
-    <button @click="isModalOpen = false">Done</button>
+    <FileUploader @close-modal="isModalOpen = false" />
   </Modal>
   <ul class="no-list">
     <DocumentItem v-for="doc in documents" :key="doc.key" :document="doc"></DocumentItem>

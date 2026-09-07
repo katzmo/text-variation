@@ -97,9 +97,30 @@ export function useDocumentProcessor() {
     return tx.done
   }
 
+  /**
+   * Add group IDs from the store to the XML.
+   *
+   * @param {Document} xml - Parsed XML document.
+   * @param {object} doc - The document object related to the XML.
+   * @returns {Promise<void>} - Resolves when the document has been updated.
+   */
+  const applyGroups = async (xml, doc) => {
+    const tx = db.transaction(['groups', 'segments'], 'readonly')
+    for await (const cursor of tx.objectStore('segments').index('docKey').iterate(doc.key)) {
+      const group = await tx.objectStore('groups').index('segKey').get(cursor.value.key)
+      if (group) {
+        const element = xml.querySelector(`[data-id="${cursor.value.id}"]`)
+        element.setAttribute('data-group', group.id)
+      }
+    }
+    // Serialize back to XML string.
+    doc.content = new XMLSerializer().serializeToString(xml)
+  }
+
   return {
     parseXML,
     segmentXML,
+    applyGroups,
     getTextContent,
     saveSegments,
   }
