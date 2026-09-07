@@ -78,6 +78,7 @@ export function useDocumentProcessor() {
       return // assuming all segments have already been saved to the DB
     for (const [index, seg] of segments.entries()) {
       const segId = seg.getAttribute('data-id')
+      const groupId = seg.getAttribute('data-group')
       const content = getTextContent(seg)
       const segKey = await dbExec('segments', 'add', {
         docKey: doc.key,
@@ -85,6 +86,12 @@ export function useDocumentProcessor() {
         pos: index + 1,
         content,
       })
+      if (groupId)
+        await dbExec('groups', 'add', {
+          id: groupId,
+          docKey: doc.key,
+          segKey: segKey,
+        })
       for (const token of tokenize(content)) {
         tokens[token] ??= []
         tokens[token].push(segKey)

@@ -22,7 +22,10 @@ export function useAlignmentProcessor() {
         docKeys.slice(i + 1).map((doc2) => alignPair(doc1, doc2, options)),
       ),
     )
-    const sorted = candidates.flat().sort((a, b) => desc(a[2], b[2]))
+    const sorted = candidates
+      .flat()
+      .filter((val) => val)
+      .sort((a, b) => desc(a[2], b[2]))
     return pickScores(sorted)
   }
 
@@ -102,7 +105,7 @@ export function useAlignmentProcessor() {
    */
   const pickScores = async (scores) => {
     // Keep track of already aligned segments.
-    const groupedSegs = new Map()
+    const groupedSegs = await loadSegmentGroupMap()
     let tx = db.transaction('scores', 'readwrite')
 
     // Pick the best available pairing for unaligned segments.
@@ -160,6 +163,27 @@ export function useAlignmentProcessor() {
   }
 
   /**
+   * Load existing groups from the store.
+   *
+   * @returns {Promise<Map>} - A map of groups keyed by segment key.
+   */
+  const loadSegmentGroupMap = async () => {
+    const groupMap = new Map()
+    const groups = new Map()
+    const store = db.transaction('groups', 'readonly').store
+    for await (const cursor of store) {
+      const item = cursor.value
+      if (!groups.has(item.id)) {
+        groups.set(item.id, { id: item.id, segments: new Map([[item.docKey, item.segKey]]) })
+      } else {
+        groups.get(item.id).segments.set(item.docKey, item.segKey)
+      }
+      groupMap.set(item.segKey, { ...item, group: groups.get(item.id) })
+    }
+    return groupMap
+  }
+
+  /**
    * Save a map of groups in the store.
    *
    * @param {Map} groupedSegs - A map of groups keyed by segment key.
@@ -193,6 +217,7 @@ export function useAlignmentProcessor() {
     filterTopCandidates,
     pickScores,
     checkPairing,
+    loadSegmentGroupMap,
     saveSegmentGroupMap,
   }
 }
