@@ -28,7 +28,6 @@ export function useCETEI() {
    */
   const appendXmlString = (wrapper, xmlString) => {
     onMounted(() => {
-      console.log(wrapper.value)
       CETEIcean.value.makeHTML5(xmlString, (data) => {
         wrapper.value.appendChild(data)
       })
