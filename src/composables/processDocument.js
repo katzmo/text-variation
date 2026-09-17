@@ -1,4 +1,4 @@
-import { tokenize } from '@/utils'
+import { tokenize } from '@/utils/utils'
 import { useIndexedDBStore } from '@/composables/db'
 
 /**
