@@ -1,4 +1,5 @@
-import { asc, desc, generateId } from '@/utils'
+import { asc, desc, generateId } from '@/utils/utils'
+import { getSimilarityScore } from '@/utils/distance'
 import { useIndexedDBStore } from '@/composables/db'
 
 /**
@@ -11,8 +12,9 @@ export function useAlignmentProcessor() {
   /**
    * Align each document with every other.
    *
-   * @param {Object} [options] - Configuration options.
-   * @param {number} [options.topK=10] - Number of top candidates to consider.
+   * @param {Object} [options] - Configuration options for filtering segment pairs.
+   * @param {number} [options.topK] - Number of top candidates to consider.
+   * @param {number} [options.threshold] - Similarity threshold for candidates.
    * @returns {Promise<void>} - Segments have been aligned, grouped and scored.
    */
   const alignSegments = async (options = {}) => {
@@ -34,8 +36,9 @@ export function useAlignmentProcessor() {
    *
    * @param {string} docKey1 - First document key.
    * @param {string} docKey2 - Second document key.
-   * @param {Object} [options] - Configuration options.
-   * @param {number} [options.topK=10] - Number of top candidates to consider.
+   * @param {Object} [options] - Configuration options for filtering candidates.
+   * @param {number} [options.topK] - Number of top candidates to consider.
+   * @param {number} [options.threshold] - Similarity threshold for candidates.
    * @returns {Promise<Array>} Array of [docKey1, segKey1], [docKey2, segKey2], value] tuples.
    */
   const alignPair = async (docKey1, docKey2, options = {}) => {
@@ -44,7 +47,7 @@ export function useAlignmentProcessor() {
     // Find matching segments in the documents
     const candidates = await findCandidates(docKey1, docKey2)
     // Process and filter candidates
-    return filterTopCandidates(candidates, options.topK)
+    return filterTopCandidates(candidates, options)
   }
 
   /**
@@ -78,19 +81,32 @@ export function useAlignmentProcessor() {
    * Filter candidate pairs to get the most promising alignments.
    *
    * @param {Map} candidatesForDocPair - Candidate pairs with counts for a document pair.
-   * @param {number} [topK=10] - Number of top candidates per segment.
+   * @param {Object} [options] - Configuration options.
+   * @param {number} [options.topK=10] - Number of top candidates per segment.
+   * @param {number} [options.threshold=0.2] - Similarity threshold for candidates.
    * @returns {Promise<Array>} Array of [[docKey1, segKey1], [docKey2, segKey2], score] tuples.
    */
-  const filterTopCandidates = async (candidatesForDocPair, topK = 10) => {
+  const filterTopCandidates = async (candidatesForDocPair, options) => {
+    const { topK = 10, threshold = 0.2 } = options
     const scores = []
     const [[docKeys, candidates]] = candidatesForDocPair.entries()
+    const segments = await Promise.all(
+      docKeys.map((docKey) => db.getAllFromIndex('segments', 'docKey', docKey)),
+    )
+    const segmentsByKey = new Map(segments.flat().map((seg) => [seg.key, seg.content]))
     // Flatten nested objects.
     for (const [segKey1, candidates2] of candidates) {
       Array.from(candidates2.entries())
         .sort((a, b) => desc(a[1], b[1])) // sorts by count descending
         .slice(0, topK) // keeps only the top k candidates
-        .map(async ([segKey2, score]) => {
-          scores.push([[docKeys[0], segKey1], [docKeys[1], segKey2], score])
+        .map(async ([segKey2]) => {
+          const score = getSimilarityScore(
+            segmentsByKey.get(segKey1),
+            segmentsByKey.get(segKey2),
+          )
+          if (score >= threshold) {
+            scores.push([[docKeys[0], segKey1], [docKeys[1], segKey2], score])
+          }
         })
     }
     return scores
