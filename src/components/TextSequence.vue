@@ -67,5 +67,9 @@ appendXmlString(display, props.xmlString)
     z-index: 10;
     top: 0;
   }
+
+  tei-facsimile {
+    display: none;
+  }
 }
 </style>
