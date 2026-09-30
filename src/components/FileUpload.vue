@@ -1,11 +1,19 @@
 <script setup>
 import { ref, watch } from 'vue'
-import { useFileDialog, useDropZone, useStorage } from '@vueuse/core'
+import { useFileDialog, useDropZone } from '@vueuse/core'
+import { useIndexedDBStore } from '@/composables/db'
+import { useAlignmentProcessor } from '@/composables/processAlignment'
+import { useDocumentProcessor } from '@/composables/processDocument'
+import IconWaiting from './icons/IconWaiting.vue'
 
-const emit = defineEmits(['documents-updated'])
+const emit = defineEmits(['close-modal', 'documents-updated'])
 
-// Reactive storage for files
-const documents = useStorage('documents', [], localStorage)
+const message = ref()
+const isProcessing = ref(false)
+
+const { documents, dbExec } = useIndexedDBStore()
+const { parseXML, segmentXML, applyGroups, saveSegments } = useDocumentProcessor()
+const { alignSegments } = useAlignmentProcessor()
 
 // File dialog for browsing
 const {
@@ -34,18 +42,32 @@ watch(selectedFiles, (newFiles) => {
 /**
  * Process uploaded files from dialog or drop and save them.
  *
- * @param {Array} fileList
+ * @param {Array} fileList - Uploaded files
+ * @returns {Promise<void>} - Promise that esolves when all files have been processed.
  * @emits documents-updated
  */
-// Process files (from dialog or drop)
 const processFiles = async (fileList) => {
-  const newFiles = await Promise.all(
+  isProcessing.value = true
+  await Promise.all(
     Array.from(fileList).map(async (file) => {
       const content = await readFileAsText(file)
-      return { name: file.name, size: file.size, content }
+      const doc = {
+        id: file.name.split('.', 1)[0],
+        name: file.name,
+        size: file.size,
+        content,
+      }
+      const xml = parseXML(doc)
+      segmentXML(xml, doc)
+      doc.key = await dbExec('documents', 'add', doc)
+      if (!doc.key) {
+        message.value = `Error uploading ${file.name}: ${doc.id} already exists.`
+        return
+      }
+      await saveSegments(xml, doc)
     }),
   )
-  documents.value = [...documents.value, ...newFiles]
+  isProcessing.value = false
   emit('documents-updated', documents.value)
 }
 
@@ -53,7 +75,7 @@ const processFiles = async (fileList) => {
  * Read a file as text.
  *
  * @param file - The file to read.
- * @returns {Promise} - Promise that resolves with the text.
+ * @returns {Promise<string>} - Promise that resolves with the text.
  */
 const readFileAsText = (file) => {
   return new Promise((resolve) => {
@@ -66,21 +88,44 @@ const readFileAsText = (file) => {
 /**
  * Remove a file from upload.
  *
- * @param {number} index - List index of the file to remove.
+ * @param {number} id - ID of the file to remove.
+ * @returns {Promise<void>} - Resolves when file has been deleted.
  * @emits documents-updated
  */
-const removeFile = (index) => {
-  documents.value.splice(index, 1)
+const removeFile = async (key) => {
+  await dbExec('documents', 'delete', key)
   emit('documents-updated', documents.value)
 }
 
 /**
  * Clear all files from upload.
+ *
+ * @returns {Promise<void>} - Resolves when the table has been cleared.
  * @emits documents-updated
  */
-const clearFiles = () => {
-  documents.value = []
+const clearFiles = async () => {
+  await dbExec('documents', 'clear')
   emit('documents-updated', documents.value)
+}
+
+/**
+ * Save matching segment groups and scores.
+ *
+ * @returns {Promise<void>} - Resolves when groups and scores have been saved.
+ * @emits close-modal
+ */
+const runAlignment = async () => {
+  isProcessing.value = true
+  await alignSegments()
+  await Promise.all(
+    documents.value.map(async (doc) => {
+      const xml = parseXML(doc)
+      await applyGroups(xml, doc)
+      return await dbExec('documents', 'put', { ...doc })
+    }),
+  )
+  isProcessing.value = false
+  emit('close-modal')
 }
 </script>
 
@@ -90,19 +135,25 @@ const clearFiles = () => {
       <p>Drag & drop TEI files here or click to upload</p>
       <button @click="openFileDialog" class="button">Upload Files</button>
     </div>
-
+    <div v-if="message" class="error message">{{ message }}</div>
     <div v-if="documents.length > 0" class="file-list">
       <button @click="clearFiles" class="clear">Clear All</button>
       <h3>Uploaded Files:</h3>
       <ul>
-        <li v-for="(file, index) in documents" :key="index" class="file-item">
+        <li v-for="file in documents" :key="file.key" class="file-item">
           <span>{{ file.name }} ({{ Math.round(file.size / 1000) }} kB)</span>
-          <button @click="removeFile(index)" class="remove" aria-label="remove file">
+          <button @click="removeFile(file.key)" class="remove" aria-label="remove file">
             &times;
           </button>
         </li>
       </ul>
     </div>
+  </div>
+  <button v-if="documents.length > 0" @click="runAlignment" :disabled="isProcessing">
+    Run alignment
+  </button>
+  <div class="processing" v-if="isProcessing">
+    <IconWaiting width="4em" aria-label="Processing documents." />
   </div>
 </template>
 
@@ -126,6 +177,11 @@ const clearFiles = () => {
   border-bottom: 1px solid var(--color-border);
 }
 
+.error {
+  color: #ff4444;
+  font-weight: bold;
+}
+
 button.remove,
 button.clear {
   --color-button: none;
@@ -144,5 +200,10 @@ button.remove {
   font-size: 1.5em;
   padding: 0em 0.5em;
   margin-top: -0.33rem;
+}
+
+.processing {
+  display: flex;
+  justify-content: center;
 }
 </style>

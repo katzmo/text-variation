@@ -1,0 +1,134 @@
+import { tokenize } from '@/utils'
+import { useIndexedDBStore } from '@/composables/db'
+
+/**
+ * A composable for extracting data from documents to the DB.
+ * @returns {Object} An object containing preprocessing functions.
+ */
+export function useDocumentProcessor() {
+  const { db, dbExec } = useIndexedDBStore()
+
+  /**
+   * Process uploaded TEI files before saving them.
+   *
+   * @param {object} doc - A document object with XML content.
+   * @returns {Document} - The parsed XML document.
+   */
+  const parseXML = (doc) => {
+    const parser = new DOMParser()
+    const xml = parser.parseFromString(doc.content, 'text/xml')
+    // Read document ID.
+    doc.id = xml.documentElement.getAttribute('xml:id') ?? doc.id
+    return xml
+  }
+
+  /**
+   * Find segments in XML.
+   *
+   * @param {Document} xml - Parsed XML document.
+   * @param {object} doc - The document object related to the XML.
+   * @param {string} [segmentSelector='head, p, lg, list'] - Selector for identifying segments.
+   */
+  const segmentXML = (xml, doc, segmentSelector = 'head, p, lg, list') => {
+    const segments = xml.querySelector('body').querySelectorAll(segmentSelector)
+    if (!segments.length) {
+      console.warn(`Found no segments "${segmentSelector}" in`, doc)
+      return
+    }
+    if (segments[0].hasAttribute('data-id')) return // Segments have already been parsed.
+    for (const [index, seg] of segments.entries()) {
+      let segId = `${doc.id}:${seg.tagName}:${index + 1}`
+      seg.setAttribute('data-id', segId)
+    }
+    // Serialize back to XML string.
+    doc.content = new XMLSerializer().serializeToString(xml)
+  }
+
+  /**
+   * Extract text content from an element, skipping specified selectors.
+   *
+   * @param {Element} element - The DOM element to extract text from.
+   * @param {string} [excludedSelector] - Selector for elements to exclude.
+   *   Defaults to 'note, del, [rend~="strikethrough"], [rend~="linethrough"],
+   *   [hidden], sic + corr, abbr + expan, orig + reg, span.reason'.
+   * @returns {string} - The extracted text.
+   */
+  const getTextContent = (element, excludedSelector) => {
+    excludedSelector ??=
+      'note, del, [rend~="strikethrough"], [rend~="linethrough"], [hidden], sic + corr, abbr + expan, orig + reg, span.reason'
+    const filteredEl = element.cloneNode(true)
+    filteredEl.querySelectorAll(excludedSelector).forEach((ex) => ex.remove())
+    return filteredEl.textContent.replace(/\s+/g, ' ')
+  }
+
+  /**
+   * Save the text and tokens of each segment to the DB.
+   *
+   * @param {Document} xml - Parsed XML document with data-ids.
+   * @param {object} doc - The document object related to the XML.
+   * @returns {Promise<void>} - Resolves when everything has been saved.
+   */
+  const saveSegments = async (xml, doc) => {
+    const segments = xml.querySelectorAll('[data-id]')
+    const tokens = {}
+    if (
+      !segments.length ||
+      (await db.getFromIndex('segments', 'id', segments[0].getAttribute('data-id')))
+    )
+      return // assuming all segments have already been saved to the DB
+    for (const [index, seg] of segments.entries()) {
+      const segId = seg.getAttribute('data-id')
+      const groupId = seg.getAttribute('data-group')
+      const content = getTextContent(seg)
+      const segKey = await dbExec('segments', 'add', {
+        docKey: doc.key,
+        id: segId,
+        pos: index + 1,
+        content,
+      })
+      if (groupId)
+        await dbExec('groups', 'add', {
+          id: groupId,
+          docKey: doc.key,
+          segKey: segKey,
+        })
+      for (const token of tokenize(content)) {
+        tokens[token] ??= []
+        tokens[token].push(segKey)
+      }
+    }
+    const tx = db.transaction('tokens', 'readwrite')
+    await Promise.all(
+      Object.entries(tokens).map(([id, segKeys]) => tx.store.add({ id, segKeys, docKey: doc.key })),
+    )
+    return tx.done
+  }
+
+  /**
+   * Add group IDs from the store to the XML.
+   *
+   * @param {Document} xml - Parsed XML document.
+   * @param {object} doc - The document object related to the XML.
+   * @returns {Promise<void>} - Resolves when the document has been updated.
+   */
+  const applyGroups = async (xml, doc) => {
+    const tx = db.transaction(['groups', 'segments'], 'readonly')
+    for await (const cursor of tx.objectStore('segments').index('docKey').iterate(doc.key)) {
+      const group = await tx.objectStore('groups').index('segKey').get(cursor.value.key)
+      if (group) {
+        const element = xml.querySelector(`[data-id="${cursor.value.id}"]`)
+        element.setAttribute('data-group', group.id)
+      }
+    }
+    // Serialize back to XML string.
+    doc.content = new XMLSerializer().serializeToString(xml)
+  }
+
+  return {
+    parseXML,
+    segmentXML,
+    applyGroups,
+    getTextContent,
+    saveSegments,
+  }
+}

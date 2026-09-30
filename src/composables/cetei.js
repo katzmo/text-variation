@@ -5,13 +5,6 @@ import CETEI from 'CETEIcean'
 const CETEIcean = ref(new CETEI({ ignoreFragmentId: true }))
 CETEIcean.value.addBehaviors({
   tei: {
-    // Display document ID
-    TEI: (el) => {
-      const xmlId = el.getAttribute('xml:id')
-      if (xmlId) {
-        el.insertAdjacentHTML('afterbegin', `<div class="identifier">${xmlId}</div>`)
-      }
-    },
     // Render line breaks
     lb: ['<br>'],
     // Display a reason in gaps
@@ -35,7 +28,6 @@ export function useCETEI() {
    */
   const appendXmlString = (wrapper, xmlString) => {
     onMounted(() => {
-      console.log(wrapper.value)
       CETEIcean.value.makeHTML5(xmlString, (data) => {
         wrapper.value.appendChild(data)
       })

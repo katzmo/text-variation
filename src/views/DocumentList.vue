@@ -1,11 +1,12 @@
 <script setup>
 import { ref } from 'vue'
-import { useStorage } from '@vueuse/core'
 import FileUploader from '@/components/FileUpload.vue'
 import Modal from '@/components/Modal.vue'
 import DocumentItem from '@/components/DocumentItem.vue'
+import { useIndexedDBStore } from '@/composables/db'
 
-const documents = useStorage('documents', [], localStorage)
+const { documents } = useIndexedDBStore()
+
 const isModalOpen = ref(false)
 </script>
 
@@ -14,10 +15,9 @@ const isModalOpen = ref(false)
   <p><button @click="isModalOpen = true">Manage data</button></p>
   <Modal v-model="isModalOpen">
     <h2>Manage data</h2>
-    <FileUploader />
-    <button @click="isModalOpen = false">Done</button>
+    <FileUploader @close-modal="isModalOpen = false" />
   </Modal>
   <ul class="no-list">
-    <DocumentItem v-for="(doc, index) in documents" :key="index" :document="doc"></DocumentItem>
+    <DocumentItem v-for="doc in documents" :key="doc.key" :document="doc"></DocumentItem>
   </ul>
 </template>

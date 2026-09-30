@@ -50,6 +50,7 @@ li button {
   color: var(--color-text);
   font-size: 0.75em;
   padding: 0.25em 0.5em;
+  width: 3em;
 }
 
 .text,
