@@ -44,6 +44,11 @@ export function useAlignmentProcessor() {
   const alignPair = async (docKey1, docKey2, options = {}) => {
     const existing = await db.getFromIndex('scores', 'docKeys', [docKey1, docKey2])
     if (existing) return
+    const inGroups1 = await db.getFromIndex('groups', 'docKey', docKey1)
+    const inGroups2 = await db.getFromIndex('groups', 'docKey', docKey2)
+    if (inGroups1 && inGroups2) {
+      return scoreGroups(docKey1, docKey2)
+    }
     // Find matching segments in the documents
     const candidates = await findCandidates(docKey1, docKey2)
     // Process and filter candidates
@@ -109,6 +114,34 @@ export function useAlignmentProcessor() {
           }
         })
     }
+    return scores
+  }
+
+  /**
+   * Calculate scores for existing groups.
+   *
+   * @param {string} docKey1 - Key of the first document.
+   * @param {string} docKey2 - Key of the second document.
+   * @returns {Promise<Array>} Array of [[docKey1, segKey1], [docKey2, segKey2], score] tuples.
+   */
+  const scoreGroups = async (docKey1, docKey2) => {
+    const groups1 = await db.getAllFromIndex('groups', 'docKey', docKey1)
+    const tx = db.transaction(['groups', 'segments'], 'readonly')
+    const groupStore = tx.objectStore('groups')
+    const segmentStore = tx.objectStore('segments')
+    const scores = []
+    for (const group of groups1) {
+      const segKey1 = group.segKey
+      const segKey2 = (await groupStore.index('idByDoc').get([group.id, docKey2]))?.segKey
+      if (segKey2) {
+        const [segment1, segment2] = await Promise.all(
+          [segKey1, segKey2].map((key) => segmentStore.get(key)),
+        )
+        const score = getSimilarityScore(segment1.content, segment2.content)
+        scores.push([[docKey1, segKey1], [docKey2, segKey2], score])
+      }
+    }
+    await tx.done
     return scores
   }
 
@@ -231,6 +264,7 @@ export function useAlignmentProcessor() {
     alignPair,
     findCandidates,
     filterTopCandidates,
+    scoreGroups,
     pickScores,
     checkPairing,
     loadSegmentGroupMap,
