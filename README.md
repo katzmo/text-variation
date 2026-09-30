@@ -1,6 +1,12 @@
-# Prototype for Visualizing Textual Variations
+# Prototype for Visualizing Textual Variations Tool
 
-This template should help get you started developing with Vue 3 in Vite.
+## Version 0.1
+
+This implements very basic functionality for uploading and aligning TEI files.
+
+Segments are currently aligned when they match the tags 'head, p, lg, list' or include the attribute 'data-id=<id>'.
+
+To skip the automatic alignment, a 'group-id=<id>' attribute can be set on aligned segments.
 
 ## Recommended IDE Setup
 
