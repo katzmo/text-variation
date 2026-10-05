@@ -15,6 +15,7 @@ export function useAlignmentProcessor() {
    * @param {Object} [options] - Configuration options for filtering segment pairs.
    * @param {number} [options.topK] - Number of top candidates to consider.
    * @param {number} [options.threshold] - Similarity threshold for candidates.
+   * @param {number} [options.penalty] - Penalty for position distance between segments.
    * @returns {Promise<void>} - Segments have been aligned, grouped and scored.
    */
   const alignSegments = async (options = {}) => {
@@ -27,7 +28,7 @@ export function useAlignmentProcessor() {
     const sorted = candidates
       .flat()
       .filter((val) => val)
-      .sort((a, b) => desc(a[2], b[2]))
+      .sort((a, b) => desc(a[3], b[3]))
     return pickScores(sorted)
   }
 
@@ -39,6 +40,7 @@ export function useAlignmentProcessor() {
    * @param {Object} [options] - Configuration options for filtering candidates.
    * @param {number} [options.topK] - Number of top candidates to consider.
    * @param {number} [options.threshold] - Similarity threshold for candidates.
+   * @param {number} [options.penalty] - Penalty for position distance between segments.
    * @returns {Promise<Array>} Array of [docKey1, segKey1], [docKey2, segKey2], value] tuples.
    */
   const alignPair = async (docKey1, docKey2, options = {}) => {
@@ -89,28 +91,30 @@ export function useAlignmentProcessor() {
    * @param {Object} [options] - Configuration options.
    * @param {number} [options.topK=10] - Number of top candidates per segment.
    * @param {number} [options.threshold=0.2] - Similarity threshold for candidates.
-   * @returns {Promise<Array>} Array of [[docKey1, segKey1], [docKey2, segKey2], score] tuples.
+   * @param {number} [options.penalty=0.01] - Penalty for position distance between segments.
+   * @returns {Promise<Array>}
+   *     Array of [[docKey1, segKey1], [docKey2, segKey2], score, sortKey] tuples.
    */
   const filterTopCandidates = async (candidatesForDocPair, options) => {
-    const { topK = 10, threshold = 0.2 } = options
+    const { topK = 10, threshold = 0.2, penalty = 0.01 } = options
     const scores = []
     const [[docKeys, candidates]] = candidatesForDocPair.entries()
     const segments = await Promise.all(
       docKeys.map((docKey) => db.getAllFromIndex('segments', 'docKey', docKey)),
     )
-    const segmentsByKey = new Map(segments.flat().map((seg) => [seg.key, seg.content]))
+    const segmentsByKey = new Map(segments.flat().map((seg) => [seg.key, seg]))
     // Flatten nested objects.
     for (const [segKey1, candidates2] of candidates) {
       Array.from(candidates2.entries())
         .sort((a, b) => desc(a[1], b[1])) // sorts by count descending
         .slice(0, topK) // keeps only the top k candidates
         .map(async ([segKey2]) => {
-          const score = getSimilarityScore(
-            segmentsByKey.get(segKey1),
-            segmentsByKey.get(segKey2),
-          )
+          const seg1 = segmentsByKey.get(segKey1)
+          const seg2 = segmentsByKey.get(segKey2)
+          const score = getSimilarityScore(seg1.content, seg2.content)
           if (score >= threshold) {
-            scores.push([[docKeys[0], segKey1], [docKeys[1], segKey2], score])
+            const sortKey = score - Math.abs(seg1.pos - seg2.pos) * penalty
+            scores.push([[docKeys[0], segKey1], [docKeys[1], segKey2], score, sortKey])
           }
         })
     }
@@ -122,7 +126,8 @@ export function useAlignmentProcessor() {
    *
    * @param {string} docKey1 - Key of the first document.
    * @param {string} docKey2 - Key of the second document.
-   * @returns {Promise<Array>} Array of [[docKey1, segKey1], [docKey2, segKey2], score] tuples.
+   * @returns {Promise<Array>}
+   *     Array of [[docKey1, segKey1], [docKey2, segKey2], score, sortKey] tuples.
    */
   const scoreGroups = async (docKey1, docKey2) => {
     const groups1 = await db.getAllFromIndex('groups', 'docKey', docKey1)
@@ -138,7 +143,7 @@ export function useAlignmentProcessor() {
           [segKey1, segKey2].map((key) => segmentStore.get(key)),
         )
         const score = getSimilarityScore(segment1.content, segment2.content)
-        scores.push([[docKey1, segKey1], [docKey2, segKey2], score])
+        scores.push([[docKey1, segKey1], [docKey2, segKey2], score, score])
       }
     }
     await tx.done
