@@ -1,6 +1,6 @@
 <template>
   <div style="position: relative; overflow-x: auto; width: 100%">
-    <svg ref="svgRef" :height="HEIGHT" style="display: block" />
+    <svg ref="svgRef" :height="height" style="display: block" />
     <div
       v-if="tooltip"
       :style="{
@@ -40,9 +40,10 @@ const emit = defineEmits(['hover', 'select'])
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const X_STEP = 120
-const HEIGHT = 750
 const MARGIN = { top: 40, right: 120, bottom: 20, left: 20 }
-const INNER_H = HEIGHT - MARGIN.top - MARGIN.bottom
+// Virtual canvas height nodes are laid out/spread/clamped within before the
+// result is measured and trimmed to its actual content (see computeNodePositions).
+const LAYOUT_H = 750 - MARGIN.top - MARGIN.bottom
 const PILL_WIDTH = 14
 const LANE_HEIGHT = 6
 const LANE_SPACING = 60
@@ -53,6 +54,7 @@ const PILL_MERGED_HOVER_STROKE = '#c8860a'
 // ── DOM refs / state ──────────────────────────────────────────────────────────
 const svgRef = ref(null)
 const tooltip = ref(null)
+const height = ref(750)
 
 // ── Pure layout helpers ───────────────────────────────────────────────────────
 function getPillHeight(translationCount) {
@@ -100,7 +102,7 @@ function resolveCollisions(nodes) {
   }
   nodes.forEach((n) => {
     const half = getPillHeight(n.translations.length) / 2
-    n.y = Math.max(half, Math.min(INNER_H - half, n.y))
+    n.y = Math.max(half, Math.min(LAYOUT_H - half, n.y))
   })
 }
 
@@ -112,8 +114,8 @@ function computeNodePositions(data, translationOrder) {
     .range([0, innerW])
 
   const maxGroups = Math.max(1, ...data.map((p) => p.groups.length))
-  const spreadH = Math.min(INNER_H, Math.max(maxGroups - 1, 1) * LANE_SPACING)
-  const spreadOffset = (INNER_H - spreadH) / 2
+  const spreadH = Math.min(LAYOUT_H, Math.max(maxGroups - 1, 1) * LANE_SPACING)
+  const spreadOffset = (LAYOUT_H - spreadH) / 2
 
   const translationY = (t) => {
     const idx = translationOrder.indexOf(t)
@@ -162,14 +164,14 @@ function computeNodePositions(data, translationOrder) {
     const largestNode = posNodes.reduce((a, b) =>
       a.translations.length >= b.translations.length ? a : b,
     )
-    const delta = INNER_H / 2 - largestNode.y
+    const delta = LAYOUT_H / 2 - largestNode.y
     posNodes.forEach((n) => {
       n.y += delta
     })
 
     posNodes.forEach((n) => {
       const half = getPillHeight(n.translations.length) / 2
-      n.y = Math.max(half, Math.min(INNER_H - half, n.y))
+      n.y = Math.max(half, Math.min(LAYOUT_H - half, n.y))
     })
 
     posNodes.forEach((node) => {
@@ -181,7 +183,26 @@ function computeNodePositions(data, translationOrder) {
     nodes.push(posNodes)
   })
 
-  return { nodes, xScale, innerW }
+  // Nodes were laid out within the fixed LAYOUT_H virtual canvas above, but
+  // rarely use all of it. Measure the actual vertical extent of the content
+  // and shift everything to hug the top, trimming unused space while leaving
+  // every node's position relative to the others untouched.
+  let minY = Infinity
+  let maxY = -Infinity
+  nodes.forEach((posNodes) => {
+    posNodes.forEach((n) => {
+      const half = getPillHeight(n.translations.length) / 2
+      minY = Math.min(minY, n.y - half)
+      maxY = Math.max(maxY, n.y + half)
+    })
+  })
+  nodes.forEach((posNodes) => {
+    posNodes.forEach((n) => {
+      n.y -= minY
+    })
+  })
+
+  return { nodes, xScale, innerW, contentHeight: maxY - minY }
 }
 
 function buildPaths(data, nodes, translationOrder, zoom) {
@@ -255,9 +276,15 @@ function drawGraph() {
 
   const g = svg.append('g').attr('transform', `translate(${MARGIN.left},${MARGIN.top})`)
 
-  const { nodes, xScale, innerW } = computeNodePositions(props.data, props.translationOrder)
+  const { nodes, xScale, innerW, contentHeight } = computeNodePositions(
+    props.data,
+    props.translationOrder,
+  )
+  const innerH = contentHeight
   const totalWidth = innerW + MARGIN.left + MARGIN.right
-  svg.attr('width', totalWidth).attr('height', HEIGHT)
+  const totalHeight = innerH + MARGIN.top + MARGIN.bottom
+  height.value = totalHeight
+  svg.attr('width', totalWidth).attr('height', totalHeight)
 
   // zoom = 1 spreads each witness into its own lane (full detail); zoom = 0
   // collapses every witness in a node onto the same point, so overlapping
@@ -321,7 +348,7 @@ function drawGraph() {
       .attr('x1', x)
       .attr('x2', x)
       .attr('y1', 0)
-      .attr('y2', INNER_H)
+      .attr('y2', innerH)
       .attr('stroke', '#ccc')
       .attr('stroke-width', 1)
   })
