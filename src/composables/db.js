@@ -3,7 +3,8 @@ import { onMounted, ref } from 'vue'
 
 const dbName = 'TextTool'
 const storeNames = ['documents', 'groups', 'scores', 'segments', 'tokens']
-const stores = Object.fromEntries(storeNames.map((key) => [key, ref([])]))
+const lastUpdated = Object.fromEntries(storeNames.map((key) => [key, ref([])]))
+const reactiveStores = Object.fromEntries(['documents'].map((key) => [key, ref([])]))
 let db = null
 
 /**
@@ -75,9 +76,12 @@ export const useIndexedDBStore = () => {
           storeNames.filter((name) => name !== 'documents').map((name) => dbExec(name, action)),
         )
       }
-      // Update data after changes
+      // Update references after changes
       if (['put', 'add', 'delete', 'clear'].includes(action)) {
-        stores[storeName].value = await dbExec(storeName, 'getAll')
+        lastUpdated[storeName].value = Date.now()
+        if (reactiveStores[storeName]) {
+          reactiveStores[storeName].value = await dbExec(storeName, 'getAll')
+        }
       }
       return resolved
     } catch (err) {
@@ -101,21 +105,38 @@ export const useIndexedDBStore = () => {
         throw err
       }
       await Promise.all(keys.map((key) => db.delete(storeName, key)))
-      // Upadate reference
-      stores[storeName].value = await dbExec(storeName, 'getAll')
+      // Upadate references
+      lastUpdated[storeName].value = Date.now()
+      if (reactiveStores[storeName]) {
+        reactiveStores[storeName].value = await dbExec(storeName, 'getAll')
+      }
+    })
+  }
+
+  /**
+   * Watch updates to a store.
+   *
+   * @param {string} storeName - The name of the store to watch.
+   * @param {function(number): void} callback - The callback to execute on update.
+   * @returns {function} A stop handle function to unsubscribe from watching.
+   */
+  const watchStore = (storeName, callback) => {
+    return watch(lastUpdated[storeName], (timestamp) => {
+      callback(timestamp)
     })
   }
 
   onMounted(async () => {
     // Initialize data
-    storeNames.forEach(
-      async (storeName) => (stores[storeName].value = await dbExec(storeName, 'getAll')),
-    )
+    Object.entries(reactiveStores).forEach(async ([storeName, store]) => {
+      store.value = await dbExec(storeName, 'getAll')
+    })
   })
 
   return {
-    ...stores,
+    ...reactiveStores,
     db,
     dbExec,
+    watchStore,
   }
 }
