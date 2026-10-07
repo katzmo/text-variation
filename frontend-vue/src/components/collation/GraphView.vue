@@ -50,6 +50,9 @@ const LANE_SPACING = 60
 const PILL_FILL = '#e8e8e8'
 const PILL_MERGED_HOVER_FILL = '#f5dfa0'
 const PILL_MERGED_HOVER_STROKE = '#c8860a'
+const LABEL_GAP = 6
+const LABEL_LINE_H = 11
+const LABEL_TEXT_H = 9
 
 // ── DOM refs / state ──────────────────────────────────────────────────────────
 const svgRef = ref(null)
@@ -81,7 +84,13 @@ function getInterpolatedPillHeight(translationCount, zoom) {
   return bundledHeight * (1 - zoom) + detailHeight * zoom
 }
 
-function resolveCollisions(nodes) {
+//get label text height to prevent text overlap on merged text
+function getLabelExtent(node, showMerged) {
+  const lines = showMerged ? Math.max(1, getWordBreakdown(node).length) : 1
+  return LABEL_GAP + (lines - 1) * LABEL_LINE_H + LABEL_TEXT_H
+}
+
+function resolveCollisions(nodes, showMerged) {
   const iterations = 20
   for (let iter = 0; iter < iterations; iter++) {
     nodes.sort((a, b) => a.y - b.y)
@@ -90,7 +99,10 @@ function resolveCollisions(nodes) {
       const a = nodes[i]
       const b = nodes[i + 1]
       const minGap =
-        getPillHeight(a.translations.length) / 2 + getPillHeight(b.translations.length) / 2 + 24
+        getPillHeight(a.translations.length) / 2 +
+        getPillHeight(b.translations.length) / 2 +
+        getLabelExtent(b, showMerged) +
+        9
       const overlap = minGap - (b.y - a.y)
       if (overlap > 0) {
         a.y -= overlap / 2
@@ -106,7 +118,7 @@ function resolveCollisions(nodes) {
   })
 }
 
-function computeNodePositions(data, translationOrder) {
+function computeNodePositions(data, translationOrder, showMerged) {
   const innerW = (data.length - 1) * X_STEP
   const xScale = d3
     .scalePoint()
@@ -159,7 +171,7 @@ function computeNodePositions(data, translationOrder) {
     })
 
     posNodes.sort((a, b) => a.y - b.y)
-    resolveCollisions(posNodes)
+    resolveCollisions(posNodes, showMerged)
 
     const largestNode = posNodes.reduce((a, b) =>
       a.translations.length >= b.translations.length ? a : b,
@@ -192,7 +204,7 @@ function computeNodePositions(data, translationOrder) {
   nodes.forEach((posNodes) => {
     posNodes.forEach((n) => {
       const half = getPillHeight(n.translations.length) / 2
-      minY = Math.min(minY, n.y - half)
+      minY = Math.min(minY, n.y - half - getLabelExtent(n, showMerged))
       maxY = Math.max(maxY, n.y + half)
     })
   })
@@ -279,6 +291,7 @@ function drawGraph() {
   const { nodes, xScale, innerW, contentHeight } = computeNodePositions(
     props.data,
     props.translationOrder,
+    props.showMerged,
   )
   const innerH = contentHeight
   const totalWidth = innerW + MARGIN.left + MARGIN.right
@@ -393,11 +406,10 @@ function drawGraph() {
       // of collapsing to the majority word — most frequent nearest the pill.
       const stacked = props.showMerged ? getWordBreakdown(node) : null
       if (stacked && stacked.length > 1) {
-        const LABEL_LINE_H = 11
         stacked.forEach(({ word }, i) => {
           g.append('text')
             .attr('x', node.x)
-            .attr('y', pillY - 6 - i * LABEL_LINE_H)
+            .attr('y', pillY - LABEL_GAP - i * LABEL_LINE_H)
             .attr('text-anchor', 'middle')
             .attr('font-size', '10px')
             .attr('fill', '#444')
@@ -407,7 +419,7 @@ function drawGraph() {
       } else {
         g.append('text')
           .attr('x', node.x)
-          .attr('y', pillY - 6)
+          .attr('y', pillY - LABEL_GAP)
           .attr('text-anchor', 'middle')
           .attr('font-size', '11px')
           .attr('fill', '#444')
