@@ -39,6 +39,9 @@
   --color-button-disabled: rgba(44, 62, 80, 0.5);
   --color-button-text: var(--vt-c-text-dark-1);
 
+  --color-score-100: oklch(0.92 0.16 100);
+  --color-score-0: oklch(0.38 0.16 340);
+
   --font-size: 100%;
   --line-height: 1.5;
   --line-height-compact: 1.2;

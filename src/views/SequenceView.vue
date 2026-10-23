@@ -48,6 +48,7 @@ watchDebounced(
     <TextSequence
       v-for="doc in documents"
       :key="doc.key + doc.content.length.toString()"
+      :docKey="doc.key"
       :name="doc.id"
       :xmlString="doc.content"
     ></TextSequence>
@@ -57,7 +58,7 @@ watchDebounced(
 <style>
 #sequences {
   --zoom-level: 0.5;
-  --text-color: var(--color-text);
+  --bg-opacity: max(calc(0.8 - var(--zoom-level)), 0.2);
   display: flex;
   column-gap: max(1%, 1rem);
   padding-left: max(1%, 1rem);
