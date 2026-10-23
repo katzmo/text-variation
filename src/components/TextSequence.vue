@@ -1,16 +1,25 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { useCETEI } from '@/composables/cetei'
+import { useScores } from '@/composables/score'
+import { useIndexedDBStore } from '@/composables/db'
 
 const props = defineProps({
+  docKey: Number,
   name: String,
   xmlString: String,
 })
 
 const display = ref()
 const { appendXmlString } = useCETEI()
+const { lastUpdated } = useIndexedDBStore()
+const { updateScores } = useScores(display)
 
 appendXmlString(display, props.xmlString)
+
+watch([display, lastUpdated['scores']], () => {
+  updateScores(props.docKey)
+})
 </script>
 
 <template>
@@ -29,20 +38,28 @@ appendXmlString(display, props.xmlString)
     display: block;
     zoom: var(--zoom-level);
     font-size: clamp(33%, 100% * var(--zoom-level), 100%);
-    color: rgba(50, 50, 50, var(--zoom-level));
+    color: oklch(from var(--color-text) l c h / var(--zoom-level));
     min-width: 22em;
     max-width: 100em;
     margin-left: auto;
     margin-right: auto;
+
+    @media (prefers-color-scheme: dark) {
+      color: rgba(200, 200, 200, var(--zoom-level));
+    }
   }
 
   .text-segment,
   [data-id] {
+    --color-segment: var(--color-background-soft);
     display: block;
     text-align: justify;
     padding: 0.5em;
     margin-top: 1em;
-    background-color: var(--color-background-soft);
+    background-color: color-mix(
+      var(--color-segment) calc(var(--bg-opacity) * 100%),
+      var(--color-background-soft)
+    );
     transition: filter 400ms ease-in-out;
   }
 

@@ -1,5 +1,5 @@
 import { openDB } from 'idb'
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 
 const dbName = 'TextTool'
 const storeNames = ['documents', 'groups', 'scores', 'segments', 'tokens']
@@ -113,19 +113,6 @@ export const useIndexedDBStore = () => {
     })
   }
 
-  /**
-   * Watch updates to a store.
-   *
-   * @param {string} storeName - The name of the store to watch.
-   * @param {function(number): void} callback - The callback to execute on update.
-   * @returns {function} A stop handle function to unsubscribe from watching.
-   */
-  const watchStore = (storeName, callback) => {
-    return watch(lastUpdated[storeName], (timestamp) => {
-      callback(timestamp)
-    })
-  }
-
   onMounted(async () => {
     // Initialize data
     Object.entries(reactiveStores).forEach(async ([storeName, store]) => {
@@ -135,8 +122,8 @@ export const useIndexedDBStore = () => {
 
   return {
     ...reactiveStores,
+    lastUpdated,
     db,
     dbExec,
-    watchStore,
   }
 }
