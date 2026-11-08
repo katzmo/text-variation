@@ -10,27 +10,31 @@
  *
  * Supports insertions, deletions, substitutions with customizable cost and
  * adjacent transpositions while each substring may only be transformed once.
+ * When a max cost is given, the function only calculates edit paths within it.
  *
  * @param {Array} sequenceA - An array of words or characters.
  * @param {Array} sequenceB - Another array of words or characters.
- * @param {Function} [substitutionFunc=(a, b) => (a === b ? 0 : 1)]
- *   - A custom function for calculating substitution costs in [0,1].
- * @returns {number} - The calculated edit distance.
+ * @param {Object} [options] - Configuration options.
+ * @param {number} [options.maxCost=100] - Maximum allowed cost, discard if higher.
+ * @param {Function} [options.substitutionFunc=(a, b) => (a === b ? 0 : 1)]
+ *   - A custom function for calculating substitution costs in [0, 1].
+ * @returns {number|null} - The calculated edit distance if <= maxCost.
  */
-export function getEditDistance(sequenceA, sequenceB, substitutionFunc) {
-  if (sequenceA.length === 0) return sequenceB.length
-  if (sequenceB.length === 0) return sequenceA.length
-
-  substitutionFunc ??= (a, b) => (a === b ? 0 : 1)
-
+export function getEditDistance(sequenceA, sequenceB, options = {}) {
+  const { maxCost = 100, substitutionFunc = (a, b) => (a === b ? 0 : 1) } = options
   const [source, target] =
     sequenceB.length > sequenceA.length ? [sequenceA, sequenceB] : [sequenceB, sequenceA]
+
+  if (target.length - source.length > maxCost) return null
+  if (source.length === 0) return target.length
+
   let previousRow = Array.from({ length: target.length + 1 }, (_, j) => j)
   let earlierRow
 
   for (let i = 0; i < source.length; i++) {
-    const currentRow = new Array(target.length + 1)
-    currentRow[0] = i + 1
+    const currentRow = new Array(target.length + 1).fill(maxCost + 1)
+    if (i < maxCost) currentRow[0] = i + 1
+    let currentRowMin = maxCost + 1
 
     for (let j = 0; j < target.length; j++) {
       const substitutionCost = previousRow[j] + substitutionFunc(source[i], target[j])
@@ -44,14 +48,18 @@ export function getEditDistance(sequenceA, sequenceB, substitutionFunc) {
         const transposition = earlierRow[j - 1] + 1
         minCost = Math.min(minCost, transposition)
       }
-
+      if (minCost < currentRowMin) currentRowMin = minCost
       currentRow[j + 1] = minCost
     }
+    // Still within cost limit?
+    if (currentRowMin > maxCost) return null
 
     earlierRow = previousRow
     previousRow = currentRow
   }
-  return previousRow[target.length]
+
+  const distance = previousRow[target.length]
+  return distance > maxCost ? null : distance
 }
 
 /**
@@ -59,12 +67,17 @@ export function getEditDistance(sequenceA, sequenceB, substitutionFunc) {
  *
  * @param {Array} sequenceA - An array of words or characters.
  * @param {Array} sequenceB - Another array of words or characters.
- * @param {Function} [substitutionFunc] - A custom cost function for substitutions.
+ * @param {Object} [options] - Configuration options.
+ * @param {number} [options.threshold=0] - Similarity threshold for scores in [0, 1].
+ * @param {Function} [options.substitutionFunc] - Custom function for substitutions.
  * @return {number} - A score in [0, 1].
  */
-export function getNormalizedDistance(sequenceA, sequenceB, substitutionFunc) {
-  const distance = getEditDistance(sequenceA, sequenceB, substitutionFunc)
-  return Math.max(0, 1 - distance / Math.max(sequenceA.length, sequenceB.length))
+export function getNormalizedDistance(sequenceA, sequenceB, options = {}) {
+  const { threshold = 0, substitutionFunc } = options
+  const maxLength = Math.max(sequenceA.length, sequenceB.length)
+  const maxCost = Math.round(maxLength - maxLength * threshold)
+  const distance = getEditDistance(sequenceA, sequenceB, { maxCost, substitutionFunc })
+  return distance === null ? 0 : 1 - distance / maxLength
 }
 
 /**
@@ -72,20 +85,19 @@ export function getNormalizedDistance(sequenceA, sequenceB, substitutionFunc) {
  *
  * @param {string} textA - One text segment.
  * @param {string} textB - Another text segment.
+ * @param {Object} [options] - Configuration options.
+ * @param {number} [options.threshold=0] - Minimum similarity for scores.
  * @return {number} - A normalized score between 0 and 1.
  */
-export function getSimilarityScore(textA, textB) {
+export function getSimilarityScore(textA, textB, options = {}) {
+  const { threshold = 0 } = options
   const wordsA = textA.trim().split(/\s+/)
   const wordsB = textB.trim().split(/\s+/)
-
-  return getNormalizedDistance(
-    wordsA,
-    wordsB,
-    // Similar words receive a partial substitution cost.
-    (wordA, wordB) => {
-      if (wordA === wordB) return 0
-      if (wordA.toLowerCase() === wordB.toLowerCase()) return 0.1
-      return 1 - getNormalizedDistance(Array.from(wordA), Array.from(wordB))
-    },
-  )
+  // Similar words receive a partial substitution cost.
+  const substitutionFunc = (wordA, wordB) => {
+    if (wordA === wordB) return 0
+    if (wordA.toLowerCase() === wordB.toLowerCase()) return 0.1
+    return 1 - getNormalizedDistance(Array.from(wordA), Array.from(wordB), { threshold })
+  }
+  return getNormalizedDistance(wordsA, wordsB, { threshold, substitutionFunc })
 }

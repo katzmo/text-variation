@@ -95,7 +95,7 @@ export function useAlignmentProcessor() {
    * @returns {Promise<Array>}
    *     Array of [[docKey1, segKey1], [docKey2, segKey2], score, sortKey] tuples.
    */
-  const filterTopCandidates = async (candidatesForDocPair, options) => {
+  const filterTopCandidates = async (candidatesForDocPair, options = {}) => {
     const { topK = 10, threshold = 0.2, penalty = 0.01 } = options
     const scores = []
     const [[docKeys, candidates]] = candidatesForDocPair.entries()
@@ -111,7 +111,7 @@ export function useAlignmentProcessor() {
         .map(async ([segKey2]) => {
           const seg1 = segmentsByKey.get(segKey1)
           const seg2 = segmentsByKey.get(segKey2)
-          const score = getSimilarityScore(seg1.content, seg2.content)
+          const score = getSimilarityScore(seg1.content, seg2.content, { threshold })
           if (score >= threshold) {
             const sortKey = score - Math.abs(seg1.pos - seg2.pos) * penalty
             scores.push([[docKeys[0], segKey1], [docKeys[1], segKey2], score, sortKey])
