@@ -6,8 +6,7 @@
 /**
  * Restricted Damerau–Levenshtein distance (optimal string alignment).
  *
- * Supports insertions, deletions, substitutions and adjacent transpositions
- * while each substring may only be transformed once.
+ * Supports insertions, deletions and substitutions.
  * When a max cost is given, the function only calculates edit paths within it.
  *
  * @param {Array} sequenceA - An array of words or characters.
@@ -27,7 +26,6 @@ export function getEditDistance(sequenceA, sequenceB, options = {}) {
   if (source.length === 0) return target.length
 
   let previousRow = Array.from({ length: target.length + 1 }, (_, j) => j)
-  let earlierRow
 
   for (let i = 0; i < source.length; i++) {
     const currentRow = new Array(target.length + 1).fill(maxCost + 1)
@@ -40,19 +38,11 @@ export function getEditDistance(sequenceA, sequenceB, options = {}) {
       const insertionCost = previousRow[j + 1] + 1
 
       let minCost = Math.min(substitutionCost, deletionCost, insertionCost)
-
-      // Adjacent transposition
-      if (i >= 1 && j >= 1 && source[i] === target[j - 1] && source[i - 1] === target[j]) {
-        const transposition = earlierRow[j - 1] + 1
-        minCost = Math.min(minCost, transposition)
-      }
       if (minCost < currentRowMin) currentRowMin = minCost
       currentRow[j + 1] = minCost
     }
     // Still within cost limit?
     if (currentRowMin > maxCost) return null
-
-    earlierRow = previousRow
     previousRow = currentRow
   }
 
