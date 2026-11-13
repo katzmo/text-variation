@@ -1,15 +1,13 @@
 /**
  * @module Edit distance.
- * @description Calculate the distance between two strings using a hybrid
- *   approach where distance on word level is combined with the character-level
- *   distance of substitutions.
+ * @description Calculate the distance between two strings on word level.
  */
 
 /**
  * Restricted Damerau–Levenshtein distance (optimal string alignment).
  *
- * Supports insertions, deletions, substitutions with customizable cost and
- * adjacent transpositions while each substring may only be transformed once.
+ * Supports insertions, deletions, substitutions and adjacent transpositions
+ * while each substring may only be transformed once.
  * When a max cost is given, the function only calculates edit paths within it.
  *
  * @param {Array} sequenceA - An array of words or characters.
@@ -17,7 +15,7 @@
  * @param {Object} [options] - Configuration options.
  * @param {number} [options.maxCost=100] - Maximum allowed cost, discard if higher.
  * @param {Function} [options.substitutionFunc=(a, b) => (a === b ? 0 : 1)]
- *   - A custom function for calculating substitution costs in [0, 1].
+ *   - A custom function for calculating substitution costs.
  * @returns {number|null} - The calculated edit distance if <= maxCost.
  */
 export function getEditDistance(sequenceA, sequenceB, options = {}) {
@@ -88,15 +86,14 @@ export function stripShared(sequenceA, sequenceB) {
  * @param {Array} sequenceB - Another array of words or characters.
  * @param {Object} [options] - Configuration options.
  * @param {number} [options.threshold=0] - Similarity threshold for scores in [0, 1].
- * @param {Function} [options.substitutionFunc] - Custom function for substitutions.
  * @return {number} - A score in [0, 1].
  */
 export function getNormalizedDistance(sequenceA, sequenceB, options = {}) {
-  const { threshold = 0, substitutionFunc } = options
+  const { threshold = 0 } = options
   const maxLength = Math.max(sequenceA.length, sequenceB.length)
   const maxCost = Math.round(maxLength - maxLength * threshold)
   const shortenedSequences = stripShared(sequenceA, sequenceB)
-  const distance = getEditDistance(...shortenedSequences, { maxCost, substitutionFunc })
+  const distance = getEditDistance(...shortenedSequences, { maxCost })
   return distance === null ? 0 : 1 - distance / maxLength
 }
 
@@ -110,14 +107,9 @@ export function getNormalizedDistance(sequenceA, sequenceB, options = {}) {
  * @return {number} - A normalized score between 0 and 1.
  */
 export function getSimilarityScore(textA, textB, options = {}) {
-  const { threshold = 0 } = options
   const wordsA = textA.trim().split(/\s+/)
   const wordsB = textB.trim().split(/\s+/)
-  // Similar words receive a partial substitution cost.
-  const substitutionFunc = (wordA, wordB) => {
-    if (wordA === wordB) return 0
-    if (wordA.toLowerCase() === wordB.toLowerCase()) return 0.1
-    return 1 - getNormalizedDistance(Array.from(wordA), Array.from(wordB), { threshold })
+  return getNormalizedDistance(wordsA, wordsB, options)
   }
   return getNormalizedDistance(wordsA, wordsB, { threshold, substitutionFunc })
 }
