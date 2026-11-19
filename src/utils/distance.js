@@ -3,6 +3,8 @@
  * @description Calculate the distance between two strings on word level.
  */
 
+import { normalize } from '@/utils/utils'
+
 /**
  * Optimal string alignment for longest common subsequence.
  *
@@ -83,7 +85,12 @@ export function getNormalizedDistance(sequenceA, sequenceB, options = {}) {
   const maxLength = sequenceA.length + sequenceB.length
   const maxCost = Math.round(maxLength - maxLength * threshold)
   const shortenedSequences = stripShared(sequenceA, sequenceB)
-  const distance = getEditDistance(...shortenedSequences, { maxCost })
+  const substitutionFunc = (source, target) => {
+    if (source === target) return 0
+    if (normalize(source) === normalize(target)) return 0.5
+    return 2
+  }
+  const distance = getEditDistance(...shortenedSequences, { maxCost, substitutionFunc })
   return distance === null ? 0 : 1 - distance / maxLength
 }
 

@@ -44,5 +44,15 @@ export function generateId(length = 8) {
  * @returns {Set[string]} - A set of tokens.
  */
 export function tokenize(text) {
-  return new Set(text.match(/[^\p{P}\s]+/g)?.map((t) => t.toLowerCase()))
+  return new Set(text.match(/[^\p{P}\s]+/gu)?.map((t) => t.toLowerCase()))
+}
+
+/**
+ * Simple normalization: turn into lower case, remove punctuation marks.
+ *
+ * @param {string} word - The word to normalize.
+ * @returns {string} - The normalized word.
+ */
+export function normalize(word) {
+  return word.toLowerCase().replace(/[\p{P}]+/gu, '')
 }
