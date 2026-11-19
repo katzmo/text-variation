@@ -4,7 +4,7 @@
  */
 
 /**
- * Restricted Damerau–Levenshtein distance (optimal string alignment).
+ * Optimal string alignment for longest common subsequence.
  *
  * Supports insertions, deletions and substitutions.
  * When a max cost is given, the function only calculates edit paths within it.
@@ -18,7 +18,7 @@
  * @returns {number|null} - The calculated edit distance if <= maxCost.
  */
 export function getEditDistance(sequenceA, sequenceB, options = {}) {
-  const { maxCost = 100, substitutionFunc = (a, b) => (a === b ? 0 : 1) } = options
+  const { maxCost = 100, substitutionFunc = (a, b) => (a === b ? 0 : 2) } = options
   const [source, target] =
     sequenceB.length > sequenceA.length ? [sequenceA, sequenceB] : [sequenceB, sequenceA]
 
@@ -80,7 +80,7 @@ export function stripShared(sequenceA, sequenceB) {
  */
 export function getNormalizedDistance(sequenceA, sequenceB, options = {}) {
   const { threshold = 0 } = options
-  const maxLength = Math.max(sequenceA.length, sequenceB.length)
+  const maxLength = sequenceA.length + sequenceB.length
   const maxCost = Math.round(maxLength - maxLength * threshold)
   const shortenedSequences = stripShared(sequenceA, sequenceB)
   const distance = getEditDistance(...shortenedSequences, { maxCost })
