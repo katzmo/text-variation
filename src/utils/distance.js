@@ -63,6 +63,25 @@ export function getEditDistance(sequenceA, sequenceB, options = {}) {
 }
 
 /**
+ * Strips shared parts from the start and end of two sequences.
+ *
+ * @param {string} sequenceA - An array of words or characters.
+ * @param {string} sequenceB - Another array of words or characters.
+ * @returns {string} - The stripped sequence inbetween.
+ */
+export function stripShared(sequenceA, sequenceB) {
+  let start = 0
+  let endA = sequenceA.length
+  let endB = sequenceB.length
+  while (start < Math.max(endA, endB) && sequenceA[start] === sequenceB[start]) start++
+  while (endA > start && endB > start && sequenceA[endA - 1] === sequenceB[endB - 1]) {
+    endA--
+    endB--
+  }
+  return [sequenceA.slice(start, endA), sequenceB.slice(start, endB)]
+}
+
+/**
  * Converts a distance to a similarity value in [0, 1].
  *
  * @param {Array} sequenceA - An array of words or characters.
@@ -76,7 +95,8 @@ export function getNormalizedDistance(sequenceA, sequenceB, options = {}) {
   const { threshold = 0, substitutionFunc } = options
   const maxLength = Math.max(sequenceA.length, sequenceB.length)
   const maxCost = Math.round(maxLength - maxLength * threshold)
-  const distance = getEditDistance(sequenceA, sequenceB, { maxCost, substitutionFunc })
+  const shortenedSequences = stripShared(sequenceA, sequenceB)
+  const distance = getEditDistance(...shortenedSequences, { maxCost, substitutionFunc })
   return distance === null ? 0 : 1 - distance / maxLength
 }
 
