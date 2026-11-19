@@ -58,7 +58,7 @@ export function useDocumentProcessor() {
       'note, del, [rend~="strikethrough"], [rend~="linethrough"], [hidden], sic + corr, abbr + expan, orig + reg, span.reason'
     const filteredEl = element.cloneNode(true)
     filteredEl.querySelectorAll(excludedSelector).forEach((ex) => ex.remove())
-    return filteredEl.textContent.replace(/\s+/g, ' ')
+    return filteredEl.textContent.replace(/\s+/g, ' ').normalize('NFD')
   }
 
   /**
