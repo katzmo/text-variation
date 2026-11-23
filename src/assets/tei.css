@@ -77,7 +77,8 @@ tei-title:not([rend]) {
 /* Headings */
 tei-head[data-level] {
   display: block;
-  margin-bottom: 0.5em;
+  margin: 0.75em 0 0.5em;
+  line-height: var(--line-height-compact);
 }
 tei-head[data-level='1'] {
   font-size: 180%;
@@ -96,7 +97,6 @@ tei-head[data-level='4'] {
 tei-list {
   display: block;
   margin: 0.5em 0;
-  padding-left: 1.5em;
   list-style-type: disc;
 
   &[type='ordered'] {
@@ -109,6 +109,8 @@ tei-list {
   tei-item {
     display: list-item;
     margin: 0.25em 0;
+    transform: translateX(1em);
+    margin-right: 1em;
   }
 
   tei-list {
@@ -135,12 +137,22 @@ tei-list {
 }
 
 /* Tables */
+tei-table {
+  display: block;
+  margin: 0.5em 0;
+  overflow: auto;
+}
 tei-row {
   display: table-row;
 }
 tei-cell {
   display: table-cell;
   padding: 0.25em;
+}
+
+/* Figures */
+tei-figdesc {
+  font-style: italic;
 }
 
 /* Revisions */
@@ -195,6 +207,9 @@ tei-gap {
 
 /* TEI header */
 tei-teiheader {
+  display: block;
+  margin-bottom: calc(var(--margin) * 2);
+
   tei-title {
     font-size: 160%;
   }

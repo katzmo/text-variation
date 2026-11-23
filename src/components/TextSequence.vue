@@ -87,8 +87,18 @@ watch([display, lastUpdated['scores']], () => {
     top: 0;
   }
 
-  tei-facsimile {
+  tei-fw,
+  tei-facsimile,
+  :empty {
     display: none;
+  }
+
+  tei-row {
+    display: block;
+  }
+
+  tei-cell {
+    display: inline-block;
   }
 }
 </style>
