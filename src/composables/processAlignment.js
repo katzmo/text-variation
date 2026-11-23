@@ -90,13 +90,13 @@ export function useAlignmentProcessor() {
    * @param {Map} candidatesForDocPair - Candidate pairs with counts for a document pair.
    * @param {Object} [options] - Configuration options.
    * @param {number} [options.topK=10] - Number of top candidates per segment.
-   * @param {number} [options.threshold=0.2] - Similarity threshold for candidates.
+   * @param {number} [options.threshold=0.4] - Similarity threshold for candidates.
    * @param {number} [options.penalty=0.01] - Penalty for position distance between segments.
    * @returns {Promise<Array>}
    *     Array of [[docKey1, segKey1], [docKey2, segKey2], score, sortKey] tuples.
    */
   const filterTopCandidates = async (candidatesForDocPair, options = {}) => {
-    const { topK = 10, threshold = 0.2, penalty = 0.01 } = options
+    const { topK = 10, threshold = 0.4, penalty = 0.01 } = options
     const scores = []
     const [[docKeys, candidates]] = candidatesForDocPair.entries()
     const segments = await Promise.all(
