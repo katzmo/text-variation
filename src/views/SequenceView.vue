@@ -64,9 +64,11 @@ watchDebounced(
   --zoom-level: 0.5;
   --bg-opacity: max(calc(0.8 - var(--zoom-level)), 0.2);
   display: flex;
+  justify-content: flex-start;
   column-gap: max(1%, 1rem);
   padding-left: max(1%, 1rem);
   padding-right: max(1%, 1rem);
+  padding-bottom: var(--margin);
   overflow: scroll;
   cursor: default;
   max-height: 90vh;

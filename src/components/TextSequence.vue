@@ -30,6 +30,7 @@ watch([display, lastUpdated['scores']], () => {
 
 <style>
 .text-sequence {
+  min-width: 3rem;
   margin-bottom: auto;
   transition: margin 0.3s ease;
 
@@ -79,7 +80,7 @@ watch([display, lastUpdated['scores']], () => {
 
   .identifier {
     background-color: var(--color-background);
-    font-size: max(75%, 100% * var(--zoom-level));
+    font-size: max(60%, 100% * var(--zoom-level));
     text-align: center;
     margin-bottom: 0.5rem;
     position: sticky;
