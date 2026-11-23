@@ -45,6 +45,10 @@ watch([display, lastUpdated['scores']], () => {
     margin-right: auto;
   }
 
+  * {
+    pointer-events: none;
+  }
+
   .text-segment,
   [data-id] {
     --color-segment: var(--color-background-soft);
@@ -57,9 +61,11 @@ watch([display, lastUpdated['scores']], () => {
       var(--color-background-soft)
     );
     transition: filter 400ms ease-in-out;
+    pointer-events: all;
   }
 
-  .highlighted:not(.aligned) {
+  .highlighted:not(.aligned),
+  [data-id]:not(.aligned):hover {
     filter: brightness(0.8);
   }
 

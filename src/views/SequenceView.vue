@@ -15,11 +15,15 @@ const { alignedGroupId, alignSections, highlightSections, unhighlightSections } 
 onMounted(() => {
   // Add hover background
   wrapper.value.addEventListener('mouseover', (event) => {
-    highlightSections(`[data-group="${event.target.dataset.group}"]`)
+    if (event.target.dataset.group) {
+      highlightSections(`[data-group="${event.target.dataset.group}"]`)
+    }
   })
   // Remove hover background
   wrapper.value.addEventListener('mouseout', (event) => {
-    unhighlightSections(`[data-group="${event.target.dataset.group}"]`)
+    if (event.target.dataset.group) {
+      unhighlightSections(`[data-group="${event.target.dataset.group}"]`)
+    }
   })
   // Align sections
   wrapper.value.addEventListener('click', (event) => {
