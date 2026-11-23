@@ -1,12 +1,19 @@
-# Prototype for Visualizing Textual Variations Tool
+# Prototype Tool for Visualizing Textual Variations
 
-## Version 0.1
+## Version 0.2
 
 This implements very basic functionality for uploading and aligning TEI files.
 
-Segments are currently aligned when they match the tags 'head, p, lg, list' or include the attribute 'data-id=<id>'.
+Segments are currently identified by the tags 'head, p, lg, list'. They are grouped by similarity
+based on the longest common word subsequence, with a default threshold of 0.4.
 
-To skip the automatic alignment, a 'group-id=<id>' attribute can be set on aligned segments.
+To skip the automatic matching, a 'group-id=<id>' attribute can be set on grouped segments.
+
+Background colors indicate the average similarity to all other segments in the group as a gradient
+from bright yellow (most similar) to dark red (least similar). Hovering over a segment highlights
+all segments in the group, a click aligns the text on the group.
+
+Hold CTRL or CMD and use the up and down arrows or the mouse wheel to zoom in and out of the text.
 
 ## Recommended IDE Setup
 
