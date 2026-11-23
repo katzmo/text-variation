@@ -13,15 +13,15 @@ import { onKeyDown, useCssVar } from '@vueuse/core'
  * @returns {Object} An object containing zoom-related functions and reactive properties.
  */
 export function useZoom(wrapper, options = {}) {
-  const { minZoom = 0.1, maxZoom = 1.5, zoomStep = 0.05 } = options
+  const { minZoom = 0.1, maxZoom = 1.5, zoomStep = 1.05 } = options
   const currentZoom = useCssVar('--zoom-level', wrapper)
 
   /**
    * Increases the zoom level by the specified step.
    */
   const zoomIn = () => {
-    if (currentZoom.value + zoomStep < maxZoom) {
-      currentZoom.value += zoomStep
+    if (currentZoom.value * zoomStep < maxZoom) {
+      currentZoom.value *= zoomStep
     }
   }
 
@@ -29,8 +29,8 @@ export function useZoom(wrapper, options = {}) {
    * Decreases the zoom level by the specified step.
    */
   const zoomOut = () => {
-    if (currentZoom.value - zoomStep > minZoom) {
-      currentZoom.value -= zoomStep
+    if (currentZoom.value / zoomStep > minZoom) {
+      currentZoom.value /= zoomStep
     }
   }
 
