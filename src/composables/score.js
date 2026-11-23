@@ -32,9 +32,9 @@ export function useScores(wrapper, options = {}) {
     ])
     await tx.done
     const segScores = new Map(groups.map((g) => [g.segKey, { groupId: g.id, scores: [] }]))
-    for (const { segKeys, score } of scores) {
-      // Only one segKey belongs to this document but we don‘t know which one.
-      segKeys.forEach((segKey) => segScores.get(segKey)?.scores.push(score))
+    for (const { docKeys, segKeys, score } of scores) {
+      const index = docKeys.indexOf(docKey)
+      segScores.get(segKeys[index]).scores.push(score)
     }
     return segScores
   }

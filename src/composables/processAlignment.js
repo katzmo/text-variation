@@ -166,9 +166,10 @@ export function useAlignmentProcessor() {
     for (const candidate of scores) {
       const isValid = checkPairing(candidate, groupedSegs)
       if (isValid) {
+        candidate.sort((a, b) => asc(a[0], b[0]))
         tx.store.add({
-          docKeys: [candidate[0][0], candidate[1][0]].sort(asc),
-          segKeys: [candidate[0][1], candidate[1][1]].sort(asc),
+          docKeys: [candidate[0][0], candidate[1][0]],
+          segKeys: [candidate[0][1], candidate[1][1]],
           score: candidate[2],
         })
       }
